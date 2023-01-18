@@ -1,5 +1,5 @@
 # Important 
-Get `ffmpeg` folder from original repo and place it here to be able to build this projection
+Get `ffmpeg` folder from original repo and place it here to be able to build this project
 
 PPSSPP - a fast and portable PSP emulator
 =========================================
