@@ -17,7 +17,7 @@ https://github.com/basharast/UWP2Win32
 
 - You should be able to choose new Memory stick location (anywhere)
 - You should be able to browse folder without any problem
-- You should be able to navigate between folder internally
+- You should be able to navigate between folders internally
 - You should be able to install homebrew (zip) from anywhere
 - You should be able to use and type into text fields (even on touch devices)
 - You should be able use network features like remote play
