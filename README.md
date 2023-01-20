@@ -1,5 +1,5 @@
 # PPSSPP-UWP
-PSP emulator with full UWP support (x64 and ARM)
+PSP emulator with full UWP (ARM)
 
 Legacy support with min build 15035
 
