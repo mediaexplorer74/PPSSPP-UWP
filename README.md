@@ -8,9 +8,7 @@ Legacy support with min build 15035
 
 This is the first test on my idea to create UWP storage manager
 
-check out **UWP2Win32**
-
-https://github.com/basharast/UWP2Win32
+check out **[UWP2Win32](https://github.com/basharast/UWP2Win32)**
 
 
 ## What's new?
