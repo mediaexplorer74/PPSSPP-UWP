@@ -71,6 +71,7 @@ namespace MIPSComp {
 using namespace ArmJitConstants;
 
 void ArmJit::GenerateFixedCode() {
+	MemoryAccess macc(GetCodePtr(), GetMemoryProtectPageSize());
 	BeginWrite(GetMemoryProtectPageSize());
 	const u8 *start = AlignCodePage();
 

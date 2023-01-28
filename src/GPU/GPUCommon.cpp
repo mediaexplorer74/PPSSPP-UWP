@@ -1149,8 +1149,9 @@ bool GPUCommon::InterpretList(DisplayList &list) {
 
 	// To enable breakpoints, we don't do fast matrix loads while debugger active.
 	debugRecording_ = GPUDebug::IsActive() || GPURecord::IsActive();
-	const bool useFastRunLoop = !dumpThisFrame_ && !debugRecording_;
+	const bool useFastRunLoop = (!dumpThisFrame_ && !debugRecording_);
 	while (gpuState == GPUSTATE_RUNNING) {
+		if (!isMemoryWriting) {
 		{
 			if (list.pc == list.stall) {
 				gpuState = GPUSTATE_STALL;
@@ -1158,11 +1159,14 @@ bool GPUCommon::InterpretList(DisplayList &list) {
 			}
 		}
 
-		if (useFastRunLoop) {
-			FastRunLoop(list);
-		} else {
-			SlowRunLoop(list);
-		}
+		
+			if (useFastRunLoop && g_Config.bFastLoop) {
+				FastRunLoop(list);
+			}
+			else {
+				SlowRunLoop(list);
+			}
+		
 
 		{
 			downcount = list.stall == 0 ? 0x0FFFFFFF : (list.stall - list.pc) / 4;
@@ -1171,6 +1175,7 @@ bool GPUCommon::InterpretList(DisplayList &list) {
 				// Unstalled.
 				gpuState = GPUSTATE_RUNNING;
 			}
+		}
 		}
 	}
 
@@ -1209,36 +1214,40 @@ void GPUCommon::FastRunLoop(DisplayList &list) {
 	const CommandInfo *cmdInfo = cmdInfo_;
 	int dc = downcount;
 	for (; dc > 0; --dc) {
-		// We know that display list PCs have the upper nibble == 0 - no need to mask the pointer
-		const u32 op = *(const u32_le *)(Memory::base + list.pc);
-		const u32 cmd = op >> 24;
-		const CommandInfo &info = cmdInfo[cmd];
-		const u32 diff = op ^ gstate.cmdmem[cmd];
-		if (diff == 0) {
-			if (info.flags & FLAG_EXECUTE) {
-				downcount = dc;
-				(this->*info.func)(op, diff);
-				dc = downcount;
-			}
-		} else {
-			uint64_t flags = info.flags;
-			if (flags & FLAG_FLUSHBEFOREONCHANGE) {
-				if (drawEngineCommon_->GetNumDrawCalls()) {
-					drawEngineCommon_->DispatchFlush();
+		if (!isMemoryWriting) {
+			// We know that display list PCs have the upper nibble == 0 - no need to mask the pointer
+			const u32 op = *(const u32_le*)(Memory::base + list.pc);
+			const u32 cmd = op >> 24;
+			const CommandInfo& info = cmdInfo[cmd];
+			const u32 diff = op ^ gstate.cmdmem[cmd];
+			if (diff == 0) {
+				if (info.flags & FLAG_EXECUTE) {
+					downcount = dc;
+					(this->*info.func)(op, diff);
+					dc = downcount;
 				}
 			}
-			gstate.cmdmem[cmd] = op;
-			if (flags & (FLAG_EXECUTE | FLAG_EXECUTEONCHANGE)) {
-				downcount = dc;
-				(this->*info.func)(op, diff);
-				dc = downcount;
-			} else {
-				uint64_t dirty = flags >> 8;
-				if (dirty)
-					gstate_c.Dirty(dirty);
+			else {
+				uint64_t flags = info.flags;
+				if (flags & FLAG_FLUSHBEFOREONCHANGE) {
+					if (drawEngineCommon_->GetNumDrawCalls()) {
+						drawEngineCommon_->DispatchFlush();
+					}
+				}
+				gstate.cmdmem[cmd] = op;
+				if (flags & (FLAG_EXECUTE | FLAG_EXECUTEONCHANGE)) {
+					downcount = dc;
+					(this->*info.func)(op, diff);
+					dc = downcount;
+				}
+				else {
+					uint64_t dirty = flags >> 8;
+					if (dirty)
+						gstate_c.Dirty(dirty);
+				}
 			}
+			list.pc += 4;
 		}
-		list.pc += 4;
 	}
 	downcount = 0;
 }
@@ -1266,32 +1275,35 @@ void GPUCommon::SlowRunLoop(DisplayList &list)
 	const bool dumpThisFrame = dumpThisFrame_;
 	while (downcount > 0)
 	{
-		bool process = GPUDebug::NotifyCommand(list.pc);
-		if (process) {
-			GPURecord::NotifyCommand(list.pc);
-			u32 op = Memory::ReadUnchecked_U32(list.pc);
-			u32 cmd = op >> 24;
+		if (!isMemoryWriting) {
+			bool process = GPUDebug::NotifyCommand(list.pc);
+			if (process) {
+				GPURecord::NotifyCommand(list.pc);
+				u32 op = Memory::ReadUnchecked_U32(list.pc);
+				u32 cmd = op >> 24;
 
-			u32 diff = op ^ gstate.cmdmem[cmd];
-			PreExecuteOp(op, diff);
-			if (dumpThisFrame) {
-				char temp[256];
-				u32 prev;
-				if (Memory::IsValidAddress(list.pc - 4)) {
-					prev = Memory::ReadUnchecked_U32(list.pc - 4);
-				} else {
-					prev = 0;
+				u32 diff = op ^ gstate.cmdmem[cmd];
+				PreExecuteOp(op, diff);
+				if (dumpThisFrame) {
+					char temp[256];
+					u32 prev;
+					if (Memory::IsValidAddress(list.pc - 4)) {
+						prev = Memory::ReadUnchecked_U32(list.pc - 4);
+					}
+					else {
+						prev = 0;
+					}
+					GeDisassembleOp(list.pc, op, prev, temp, 256);
+					NOTICE_LOG(G3D, "%08x: %s", op, temp);
 				}
-				GeDisassembleOp(list.pc, op, prev, temp, 256);
-				NOTICE_LOG(G3D, "%08x: %s", op, temp);
+				gstate.cmdmem[cmd] = op;
+
+				ExecuteOp(op, diff);
 			}
-			gstate.cmdmem[cmd] = op;
 
-			ExecuteOp(op, diff);
+			list.pc += 4;
+			--downcount;
 		}
-
-		list.pc += 4;
-		--downcount;
 	}
 }
 

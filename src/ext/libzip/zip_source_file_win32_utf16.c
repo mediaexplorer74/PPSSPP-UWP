@@ -31,8 +31,15 @@
   IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #ifdef MS_UWP
+#ifdef _M_ARM
+#define _ARM_
+#else
+#define _AMD64_
+#endif
 #if !defined(LEGACY_SUPPORT)
 #include <fileapifromapp.h>
+#else
+#include <fileapi.h>
 #endif
 #if !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
 #include "UWP/UWPHelpers/UWP2C.h"

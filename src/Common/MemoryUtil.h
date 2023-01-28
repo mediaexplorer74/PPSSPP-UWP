@@ -29,6 +29,29 @@ bool PlatformIsWXExclusive();
 #define MEM_PROT_WRITE 2
 #define MEM_PROT_EXEC  4
 
+void MakeExecutable(void* ptr, size_t size);
+void MakeModifiable(void* ptr, size_t size);
+
+#define EXEC_BLOCK(ptr, size) MakeExecutable( (void*)ptr, size );
+#define MODF_BLOCK(ptr, size) MakeModifiable( (void*)ptr, size );
+
+struct MemoryAccess
+{
+	template< typename T >
+	MemoryAccess(T ptr, size_t size)
+		: ptr((void*)ptr)
+		, size(size)
+	{
+		MODF_BLOCK(this->ptr, size);
+	}
+	~MemoryAccess()
+	{
+		EXEC_BLOCK(ptr, size);
+	}
+	void* ptr;
+	size_t size;
+};
+
 // Note that some platforms go through special contortions to allocate executable memory. So for memory
 // that's intended for execution, allocate it first using AllocateExecutableMemory, then modify protection as desired.
 // AllocateMemoryPages is simpler and more generic. Note that on W^X platforms, this will return executable but not writable

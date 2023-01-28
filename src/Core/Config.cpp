@@ -74,9 +74,9 @@ struct ConfigPrivate {
 };
 
 #ifdef _DEBUG
-static const char* logSectionName = "LogDebug";
+static const char *logSectionName = "LogDebug";
 #else
-static const char* logSectionName = "Log";
+static const char *logSectionName = "Log";
 #endif
 
 struct ConfigSetting {
@@ -98,32 +98,32 @@ struct ConfigSetting {
 		uint32_t u;
 		uint64_t lu;
 		float f;
-		const char* s;
-		const char* p;  // not sure how much point..
+		const char *s;
+		const char *p;  // not sure how much point..
 		ConfigTouchPos touchPos;
 		ConfigCustomButton customButton;
 	};
 	union SettingPtr {
-		bool* b;
-		int* i;
-		uint32_t* u;
-		uint64_t* lu;
-		float* f;
-		std::string* s;
-		Path* p;
-		ConfigTouchPos* touchPos;
-		ConfigCustomButton* customButton;
+		bool *b;
+		int *i;
+		uint32_t *u;
+		uint64_t *lu;
+		float *f;
+		std::string *s;
+		Path *p;
+		ConfigTouchPos *touchPos;
+		ConfigCustomButton *customButton;
 	};
 
 	typedef bool (*BoolDefaultCallback)();
 	typedef int (*IntDefaultCallback)();
-	typedef uint32_t(*Uint32DefaultCallback)();
-	typedef uint64_t(*Uint64DefaultCallback)();
+	typedef uint32_t (*Uint32DefaultCallback)();
+	typedef uint64_t (*Uint64DefaultCallback)();
 	typedef float (*FloatDefaultCallback)();
-	typedef const char* (*StringDefaultCallback)();
+	typedef const char *(*StringDefaultCallback)();
 	typedef ConfigTouchPos(*TouchPosDefaultCallback)();
-	typedef const char* (*PathDefaultCallback)();
-	typedef ConfigCustomButton(*CustomButtonDefaultCallback)();
+	typedef const char *(*PathDefaultCallback)();
+	typedef ConfigCustomButton (*CustomButtonDefaultCallback)();
 
 	union Callback {
 		BoolDefaultCallback b;
@@ -143,113 +143,113 @@ struct ConfigSetting {
 		cb_.b = nullptr;
 	}
 
-	ConfigSetting(const char* ini, bool* v, bool def, bool save = true, bool perGame = false)
+	ConfigSetting(const char *ini, bool *v, bool def, bool save = true, bool perGame = false)
 		: iniKey_(ini), type_(TYPE_BOOL), report_(false), save_(save), perGame_(perGame) {
 		ptr_.b = v;
 		cb_.b = nullptr;
 		default_.b = def;
 	}
 
-	ConfigSetting(const char* ini, int* v, int def, bool save = true, bool perGame = false)
+	ConfigSetting(const char *ini, int *v, int def, bool save = true, bool perGame = false)
 		: iniKey_(ini), type_(TYPE_INT), report_(false), save_(save), perGame_(perGame) {
 		ptr_.i = v;
 		cb_.i = nullptr;
 		default_.i = def;
 	}
 
-	ConfigSetting(const char* ini, int* v, int def, std::function<std::string(int)> transTo, std::function<int(const std::string&)> transFrom, bool save = true, bool perGame = false)
+	ConfigSetting(const char *ini, int *v, int def, std::function<std::string(int)> transTo, std::function<int(const std::string &)> transFrom, bool save = true, bool perGame = false)
 		: iniKey_(ini), type_(TYPE_INT), report_(false), save_(save), perGame_(perGame), translateTo_(transTo), translateFrom_(transFrom) {
 		ptr_.i = v;
 		cb_.i = nullptr;
 		default_.i = def;
 	}
 
-	ConfigSetting(const char* ini, uint32_t* v, uint32_t def, bool save = true, bool perGame = false)
+	ConfigSetting(const char *ini, uint32_t *v, uint32_t def, bool save = true, bool perGame = false)
 		: iniKey_(ini), type_(TYPE_UINT32), report_(false), save_(save), perGame_(perGame) {
 		ptr_.u = v;
 		cb_.u = nullptr;
 		default_.u = def;
 	}
 
-	ConfigSetting(const char* ini, uint64_t* v, uint64_t def, bool save = true, bool perGame = false)
+	ConfigSetting(const char *ini, uint64_t *v, uint64_t def, bool save = true, bool perGame = false)
 		: iniKey_(ini), type_(TYPE_UINT64), report_(false), save_(save), perGame_(perGame) {
 		ptr_.lu = v;
 		cb_.lu = nullptr;
 		default_.lu = def;
 	}
 
-	ConfigSetting(const char* ini, float* v, float def, bool save = true, bool perGame = false)
+	ConfigSetting(const char *ini, float *v, float def, bool save = true, bool perGame = false)
 		: iniKey_(ini), type_(TYPE_FLOAT), report_(false), save_(save), perGame_(perGame) {
 		ptr_.f = v;
 		cb_.f = nullptr;
 		default_.f = def;
 	}
 
-	ConfigSetting(const char* ini, std::string* v, const char* def, bool save = true, bool perGame = false)
+	ConfigSetting(const char *ini, std::string *v, const char *def, bool save = true, bool perGame = false)
 		: iniKey_(ini), type_(TYPE_STRING), report_(false), save_(save), perGame_(perGame) {
 		ptr_.s = v;
 		cb_.s = nullptr;
 		default_.s = def;
 	}
 
-	ConfigSetting(const char* ini, Path* p, const char* def, bool save = true, bool perGame = false)
+	ConfigSetting(const char *ini, Path *p, const char *def, bool save = true, bool perGame = false)
 		: iniKey_(ini), type_(TYPE_PATH), report_(false), save_(save), perGame_(perGame) {
 		ptr_.p = p;
 		cb_.p = nullptr;
 		default_.p = def;
 	}
 
-	ConfigSetting(const char* iniX, const char* iniY, const char* iniScale, const char* iniShow, ConfigTouchPos* v, ConfigTouchPos def, bool save = true, bool perGame = false)
+	ConfigSetting(const char *iniX, const char *iniY, const char *iniScale, const char *iniShow, ConfigTouchPos *v, ConfigTouchPos def, bool save = true, bool perGame = false)
 		: iniKey_(iniX), ini2_(iniY), ini3_(iniScale), ini4_(iniShow), type_(TYPE_TOUCH_POS), report_(false), save_(save), perGame_(perGame) {
 		ptr_.touchPos = v;
 		cb_.touchPos = nullptr;
 		default_.touchPos = def;
 	}
 
-	ConfigSetting(const char* iniKey, const char* iniImage, const char* iniShape, const char* iniToggle, const char* iniRepeat, ConfigCustomButton* v, ConfigCustomButton def, bool save = true, bool perGame = false)
+	ConfigSetting(const char *iniKey, const char *iniImage, const char *iniShape, const char *iniToggle, const char *iniRepeat, ConfigCustomButton *v, ConfigCustomButton def, bool save = true, bool perGame = false)
 		: iniKey_(iniKey), ini2_(iniImage), ini3_(iniShape), ini4_(iniToggle), ini5_(iniRepeat), type_(TYPE_CUSTOM_BUTTON), report_(false), save_(save), perGame_(perGame) {
 		ptr_.customButton = v;
 		cb_.customButton = nullptr;
 		default_.customButton = def;
 	}
 
-	ConfigSetting(const char* ini, bool* v, BoolDefaultCallback def, bool save = true, bool perGame = false)
+	ConfigSetting(const char *ini, bool *v, BoolDefaultCallback def, bool save = true, bool perGame = false)
 		: iniKey_(ini), type_(TYPE_BOOL), report_(false), save_(save), perGame_(perGame) {
 		ptr_.b = v;
 		cb_.b = def;
 	}
 
-	ConfigSetting(const char* ini, int* v, IntDefaultCallback def, bool save = true, bool perGame = false)
+	ConfigSetting(const char *ini, int *v, IntDefaultCallback def, bool save = true, bool perGame = false)
 		: iniKey_(ini), type_(TYPE_INT), report_(false), save_(save), perGame_(perGame) {
-		ptr_.i = v;
+		ptr_ .i = v;
 		cb_.i = def;
 	}
 
-	ConfigSetting(const char* ini, int* v, IntDefaultCallback def, std::function<std::string(int)> transTo, std::function<int(const std::string&)> transFrom, bool save = true, bool perGame = false)
+	ConfigSetting(const char *ini, int *v, IntDefaultCallback def, std::function<std::string(int)> transTo, std::function<int(const std::string &)> transFrom, bool save = true, bool perGame = false)
 		: iniKey_(ini), type_(TYPE_INT), report_(false), save_(save), perGame_(perGame), translateTo_(transTo), translateFrom_(transFrom) {
 		ptr_.i = v;
 		cb_.i = def;
 	}
 
-	ConfigSetting(const char* ini, uint32_t* v, Uint32DefaultCallback def, bool save = true, bool perGame = false)
+	ConfigSetting(const char *ini, uint32_t *v, Uint32DefaultCallback def, bool save = true, bool perGame = false)
 		: iniKey_(ini), type_(TYPE_UINT32), report_(false), save_(save), perGame_(perGame) {
-		ptr_.u = v;
+		ptr_ .u = v;
 		cb_.u = def;
 	}
 
-	ConfigSetting(const char* ini, float* v, FloatDefaultCallback def, bool save = true, bool perGame = false)
+	ConfigSetting(const char *ini, float *v, FloatDefaultCallback def, bool save = true, bool perGame = false)
 		: iniKey_(ini), type_(TYPE_FLOAT), report_(false), save_(save), perGame_(perGame) {
 		ptr_.f = v;
 		cb_.f = def;
 	}
 
-	ConfigSetting(const char* ini, std::string* v, StringDefaultCallback def, bool save = true, bool perGame = false)
+	ConfigSetting(const char *ini, std::string *v, StringDefaultCallback def, bool save = true, bool perGame = false)
 		: iniKey_(ini), type_(TYPE_STRING), report_(false), save_(save), perGame_(perGame) {
 		ptr_.s = v;
 		cb_.s = def;
 	}
 
-	ConfigSetting(const char* iniX, const char* iniY, const char* iniScale, const char* iniShow, ConfigTouchPos* v, TouchPosDefaultCallback def, bool save = true, bool perGame = false)
+	ConfigSetting(const char *iniX, const char *iniY, const char *iniScale, const char *iniShow, ConfigTouchPos *v, TouchPosDefaultCallback def, bool save = true, bool perGame = false)
 		: iniKey_(iniX), ini2_(iniY), ini3_(iniScale), ini4_(iniShow), type_(TYPE_TOUCH_POS), report_(false), save_(save), perGame_(perGame) {
 		ptr_.touchPos = v;
 		cb_.touchPos = def;
@@ -259,7 +259,7 @@ struct ConfigSetting {
 		return type_ != TYPE_TERMINATOR;
 	}
 
-	bool Get(const Section* section) {
+	bool Get(const Section *section) {
 		switch (type_) {
 		case TYPE_BOOL:
 			if (cb_.b) {
@@ -307,8 +307,7 @@ struct ConfigSetting {
 			section->Get(ini3_, &ptr_.touchPos->scale, default_.touchPos.scale);
 			if (ini4_) {
 				section->Get(ini4_, &ptr_.touchPos->show, default_.touchPos.show);
-			}
-			else {
+			} else {
 				ptr_.touchPos->show = default_.touchPos.show;
 			}
 			return true;
@@ -340,7 +339,7 @@ struct ConfigSetting {
 		}
 	}
 
-	void Set(Section* section) {
+	void Set(Section *section) {
 		if (!save_)
 			return;
 
@@ -384,7 +383,7 @@ struct ConfigSetting {
 		}
 	}
 
-	void Report(UrlEncoder& data, const std::string& prefix) {
+	void Report(UrlEncoder &data, const std::string &prefix) {
 		if (!report_)
 			return;
 
@@ -415,11 +414,11 @@ struct ConfigSetting {
 		}
 	}
 
-	const char* iniKey_ = nullptr;
-	const char* ini2_ = nullptr;
-	const char* ini3_ = nullptr;
-	const char* ini4_ = nullptr;
-	const char* ini5_ = nullptr;
+	const char *iniKey_ = nullptr;
+	const char *ini2_ = nullptr;
+	const char *ini3_ = nullptr;
+	const char *ini4_ = nullptr;
+	const char *ini5_ = nullptr;
 	Type type_;
 	bool report_;
 	bool save_;
@@ -430,31 +429,30 @@ struct ConfigSetting {
 
 	// We only support transform for ints.
 	std::function<std::string(int)> translateTo_;
-	std::function<int(const std::string&)> translateFrom_;
+	std::function<int(const std::string &)> translateFrom_;
 };
 
 struct ReportedConfigSetting : public ConfigSetting {
 	template <typename T1, typename T2>
-	ReportedConfigSetting(const char* ini, T1* v, T2 def, bool save = true, bool perGame = false)
+	ReportedConfigSetting(const char *ini, T1 *v, T2 def, bool save = true, bool perGame = false)
 		: ConfigSetting(ini, v, def, save, perGame) {
 		report_ = true;
 	}
 
 	template <typename T1, typename T2>
-	ReportedConfigSetting(const char* ini, T1* v, T2 def, std::function<std::string(int)> transTo, std::function<int(const std::string&)> transFrom, bool save = true, bool perGame = false)
+	ReportedConfigSetting(const char *ini, T1 *v, T2 def, std::function<std::string(int)> transTo, std::function<int(const std::string &)> transFrom, bool save = true, bool perGame = false)
 		: ConfigSetting(ini, v, def, transTo, transFrom, save, perGame) {
 		report_ = true;
 	}
 };
 
-const char* DefaultLangRegion() {
+const char *DefaultLangRegion() {
 	// Unfortunate default.  There's no need to use bFirstRun, since this is only a default.
 	static std::string defaultLangRegion = "en_US";
 	std::string langRegion = System_GetProperty(SYSPROP_LANGREGION);
 	if (i18nrepo.IniExists(langRegion)) {
 		defaultLangRegion = langRegion;
-	}
-	else if (langRegion.length() >= 3) {
+	} else if (langRegion.length() >= 3) {
 		// Don't give up.  Let's try a fuzzy match - so nl_BE can match nl_NL.
 		IniFile mapping;
 		mapping.LoadFromVFS("langregion.ini");
@@ -466,8 +464,7 @@ const char* DefaultLangRegion() {
 				// Exact submatch, or different case.  Let's use it.
 				defaultLangRegion = key;
 				break;
-			}
-			else if (startsWithNoCase(key, langRegion.substr(0, 3))) {
+			} else if (startsWithNoCase(key, langRegion.substr(0, 3))) {
 				// Best so far.
 				defaultLangRegion = key;
 			}
@@ -514,7 +511,7 @@ static bool DefaultCodeGen() {
 }
 
 static bool DefaultEnableStateUndo() {
-#ifdef MOBILE_DEVICE
+#ifdef MOBILE_DEVICE_WINDOWS
 	// Off on mobile to save disk space.
 	return false;
 #endif
@@ -526,23 +523,23 @@ static float DefaultUISaturation() {
 }
 
 struct ConfigSectionSettings {
-	const char* section;
-	ConfigSetting* settings;
+	const char *section;
+	ConfigSetting *settings;
 };
 
 static ConfigSetting generalSettings[] = {
 	ConfigSetting("FirstRun", &g_Config.bFirstRun, true),
 	ConfigSetting("RunCount", &g_Config.iRunCount, 0),
-	ConfigSetting("Enable Logging", &g_Config.bEnableLogging, true),
+	ConfigSetting("Enable Logging", &g_Config.bEnableLogging, false),
 	ConfigSetting("AutoRun", &g_Config.bAutoRun, true),
 	ConfigSetting("Browse", &g_Config.bBrowse, false),
 	ConfigSetting("IgnoreBadMemAccess", &g_Config.bIgnoreBadMemAccess, true, true),
 	ConfigSetting("CurrentDirectory", &g_Config.currentDirectory, ""),
 	ConfigSetting("ShowDebuggerOnLoad", &g_Config.bShowDebuggerOnLoad, false),
-	ConfigSetting("CheckForNewVersion", &g_Config.bCheckForNewVersion, true),
+	ConfigSetting("CheckForNewVersion", &g_Config.bCheckForNewVersion, false),
 	ConfigSetting("Language", &g_Config.sLanguageIni, &DefaultLangRegion),
 	ConfigSetting("ForceLagSync2", &g_Config.bForceLagSync, false, true, true),
-	ConfigSetting("DiscordPresence", &g_Config.bDiscordPresence, true, true, false),  // Or maybe it makes sense to have it per-game? Race conditions abound...
+	ConfigSetting("DiscordPresence", &g_Config.bDiscordPresence, false, true, false),  // Or maybe it makes sense to have it per-game? Race conditions abound...
 	ConfigSetting("UISound", &g_Config.bUISound, false, true, false),
 
 	ConfigSetting("AutoLoadSaveState", &g_Config.iAutoLoadSaveState, 0, true, true),
@@ -602,7 +599,7 @@ static ConfigSetting generalSettings[] = {
 #ifdef __ANDROID__
 	ConfigSetting("ScreenRotation", &g_Config.iScreenRotation, ROTATION_AUTO_HORIZONTAL),
 #endif
-	ConfigSetting("InternalScreenRotation", &g_Config.iInternalScreenRotation, ROTATION_LOCKED_HORIZONTAL, true, true),
+	ConfigSetting("InternalScreenRotation", &g_Config.iInternalScreenRotation, ROTATION_AUTO, true, true),
 
 	ConfigSetting("BackgroundAnimation", &g_Config.iBackgroundAnimation, 3, true, false),
 	ConfigSetting("TransparentBackground", &g_Config.bTransparentBackground, true, true, false),
@@ -637,8 +634,8 @@ static bool DefaultSasThread() {
 static ConfigSetting cpuSettings[] = {
 	ReportedConfigSetting("CPUCore", &g_Config.iCpuCore, &DefaultCpuCore, true, true),
 	ReportedConfigSetting("SeparateSASThread", &g_Config.bSeparateSASThread, &DefaultSasThread, true, true),
-	ReportedConfigSetting("IOTimingMethod", &g_Config.iIOTimingMethod, IOTIMING_FAST, true, true),
-	ConfigSetting("FastMemoryAccess", &g_Config.bFastMemory, true, true, true),
+	ReportedConfigSetting("IOTimingMethod", &g_Config.iIOTimingMethod, IOTIMING_REALISTIC, true, true),
+	ConfigSetting("FastMemoryAccess", &g_Config.bFastMemory, false, true, true),
 	ReportedConfigSetting("FunctionReplacements", &g_Config.bFuncReplacements, true, true, true),
 	ConfigSetting("HideSlowWarnings", &g_Config.bHideSlowWarnings, false, true, false),
 	ConfigSetting("HideStateWarnings", &g_Config.bHideStateWarnings, false, true, false),
@@ -673,7 +670,7 @@ static int DefaultFastForwardMode() {
 }
 
 // See issue 14439. Should possibly even block these devices from selecting VK.
-const char* const vulkanDefaultBlacklist[] = {
+const char * const vulkanDefaultBlacklist[] = {
 	"Sony:BRAVIA VH1",
 };
 
@@ -714,7 +711,7 @@ int Config::NextValidBackend() {
 	std::set<GPUBackend> failed;
 
 	SplitString(sFailedGPUBackends, ',', split);
-	for (const auto& str : split) {
+	for (const auto &str : split) {
 		if (!str.empty() && str != "ALL") {
 			failed.insert(GPUBackendFromString(str));
 		}
@@ -722,7 +719,7 @@ int Config::NextValidBackend() {
 
 	// Count these as "failed" too so we don't pick them.
 	SplitString(sDisabledGPUBackends, ',', split);
-	for (const auto& str : split) {
+	for (const auto &str : split) {
 		if (!str.empty()) {
 			failed.insert(GPUBackendFromString(str));
 		}
@@ -769,7 +766,7 @@ bool Config::IsBackendEnabled(GPUBackend backend, bool validate) {
 	std::vector<std::string> split;
 
 	SplitString(sDisabledGPUBackends, ',', split);
-	for (const auto& str : split) {
+	for (const auto &str : split) {
 		if (str.empty())
 			continue;
 		auto match = GPUBackendFromString(str);
@@ -805,13 +802,13 @@ bool Config::IsBackendEnabled(GPUBackend backend, bool validate) {
 	return true;
 }
 
-template <typename T, std::string(*FTo)(T), T(*FFrom)(const std::string&)>
+template <typename T, std::string (*FTo)(T), T (*FFrom)(const std::string &)>
 struct ConfigTranslator {
 	static std::string To(int v) {
 		return StringFromInt(v) + " (" + FTo(T(v)) + ")";
 	}
 
-	static int From(const std::string& v) {
+	static int From(const std::string &v) {
 		int result;
 		if (TryParse(v, &result)) {
 			return result;
@@ -822,7 +819,7 @@ struct ConfigTranslator {
 
 typedef ConfigTranslator<GPUBackend, GPUBackendToString, GPUBackendFromString> GPUBackendTranslator;
 
-static int FastForwardModeFromString(const std::string& s) {
+static int FastForwardModeFromString(const std::string &s) {
 	if (!strcasecmp(s.c_str(), "CONTINUOUS"))
 		return (int)FastForwardMode::CONTINUOUS;
 	if (!strcasecmp(s.c_str(), "SKIP_FLIP"))
@@ -845,7 +842,7 @@ static ConfigSetting graphicsSettings[] = {
 	ConfigSetting("CardboardScreenSize", &g_Config.iCardboardScreenSize, 50, true, true),
 	ConfigSetting("CardboardXShift", &g_Config.iCardboardXShift, 0, true, true),
 	ConfigSetting("CardboardYShift", &g_Config.iCardboardYShift, 0, true, true),
-	ConfigSetting("ShowFPSCounter", &g_Config.iShowFPSCounter, 0, true, true),
+	ConfigSetting("ShowFPSCounter", &g_Config.iShowFPSCounter, 3, true, true),
 	ReportedConfigSetting("GraphicsBackend", &g_Config.iGPUBackend, &DefaultGPUBackend, &GPUBackendTranslator::To, &GPUBackendTranslator::From, true, false),
 	ConfigSetting("FailedGraphicsBackends", &g_Config.sFailedGPUBackends, ""),
 	ConfigSetting("DisabledGraphicsBackends", &g_Config.sDisabledGPUBackends, ""),
@@ -865,9 +862,9 @@ static ConfigSetting graphicsSettings[] = {
 	ReportedConfigSetting("BufferFiltering", &g_Config.iBufFilter, SCALE_LINEAR, true, true),
 	ReportedConfigSetting("InternalResolution", &g_Config.iInternalResolution, &DefaultInternalResolution, true, true),
 	ReportedConfigSetting("HighQualityDepth", &g_Config.bHighQualityDepth, true, true, true),
-	ReportedConfigSetting("FrameSkip", &g_Config.iFrameSkip, 0, true, true),
+	ReportedConfigSetting("FrameSkip", &g_Config.iFrameSkip, 1, true, true),
 	ReportedConfigSetting("FrameSkipType", &g_Config.iFrameSkipType, 0, true, true),
-	ReportedConfigSetting("AutoFrameSkip", &g_Config.bAutoFrameSkip, IsVREnabled(), true, true),
+	ReportedConfigSetting("AutoFrameSkip", &g_Config.bAutoFrameSkip, true, true, true),
 	ConfigSetting("StereoRendering", &g_Config.bStereoRendering, false, true, true),
 	ConfigSetting("StereoToMonoShader", &g_Config.sStereoToMonoShader, "RedBlue", true, true),
 	ConfigSetting("FrameRate", &g_Config.iFpsLimit1, 0, true, true),
@@ -880,11 +877,18 @@ static ConfigSetting graphicsSettings[] = {
 #endif
 
 	// Most low-performance (and many high performance) mobile GPUs do not support aniso anyway so defaulting to 4 is fine.
-	ConfigSetting("AnisotropyLevel", &g_Config.iAnisotropyLevel, 4, true, true),
+	ConfigSetting("AnisotropyLevel", &g_Config.iAnisotropyLevel, 0, true, true),
 	ConfigSetting("MultiSampleLevel", &g_Config.iMultiSampleLevel, 0, true, true),  // Number of samples is 1 << iMultiSampleLevel
 
 	ReportedConfigSetting("VertexDecCache", &g_Config.bVertexCache, false, true, true),
-	ReportedConfigSetting("TextureBackoffCache", &g_Config.bTextureBackoffCache, false, true, true),
+#ifdef _M_ARM
+	ReportedConfigSetting("ExecuteWriteResolver", &g_Config.bExecuteWriteResolver, true, true, true),
+	ReportedConfigSetting("FastLoop", &g_Config.bFastLoop, false, true, true),
+#else
+	ReportedConfigSetting("ExecuteWriteResolver", &g_Config.bExecuteWriteResolver, false, true, true),
+	ReportedConfigSetting("FastLoop", &g_Config.bFastLoop, true, true, true),
+#endif
+	ReportedConfigSetting("TextureBackoffCache", &g_Config.bTextureBackoffCache, true, true, true),
 	ReportedConfigSetting("VertexDecJit", &g_Config.bVertexDecoderJit, &DefaultCodeGen, false),
 
 #ifndef MOBILE_DEVICE
@@ -920,7 +924,7 @@ static ConfigSetting graphicsSettings[] = {
 	ConfigSetting("TextureShader", &g_Config.sTextureShaderName, "Off", true, true),
 	ConfigSetting("ShaderChainRequires60FPS", &g_Config.bShaderChainRequires60FPS, false, true, true),
 
-	ReportedConfigSetting("SkipGPUReadbacks", &g_Config.bSkipGPUReadbacks, false, true, true),
+	ReportedConfigSetting("SkipGPUReadbacks", &g_Config.bSkipGPUReadbacks, true, true, true),
 
 	ConfigSetting("GfxDebugOutput", &g_Config.bGfxDebugOutput, false, false, false),
 	ConfigSetting("LogFrameDrops", &g_Config.bLogFrameDrops, false, true, false),
@@ -953,21 +957,16 @@ static bool DefaultShowTouchControls() {
 		std::string name = System_GetProperty(SYSPROP_NAME);
 		if (KeyMap::HasBuiltinController(name)) {
 			return false;
-		}
-		else {
+		} else {
 			return true;
 		}
-	}
-	else if (deviceType == DEVICE_TYPE_TV) {
+	} else if (deviceType == DEVICE_TYPE_TV) {
 		return false;
-	}
-	else if (deviceType == DEVICE_TYPE_DESKTOP) {
+	} else if (deviceType == DEVICE_TYPE_DESKTOP) {
 		return false;
-	}
-	else if (deviceType == DEVICE_TYPE_VR) {
+	} else if (deviceType == DEVICE_TYPE_VR) {
 		return false;
-	}
-	else {
+	} else {
 		return false;
 	}
 }
@@ -1009,7 +1008,7 @@ static ConfigSetting controlSettings[] = {
 
 	// ConfigSetting("KeyMapping", &g_Config.iMappingMap, 0),
 
-#ifdef MOBILE_DEVICE
+#ifdef MOBILE_DEVICE_WINDOWS
 	ConfigSetting("TiltBaseX", &g_Config.fTiltBaseX, 0.0f, true, true),
 	ConfigSetting("TiltBaseY", &g_Config.fTiltBaseY, 0.0f, true, true),
 	ConfigSetting("TiltOrientation", &g_Config.iTiltOrientation, 0, true, true),
@@ -1109,7 +1108,7 @@ static int DefaultSystemParamLanguage() {
 	int defaultLang = PSP_SYSTEMPARAM_LANGUAGE_ENGLISH;
 	if (g_Config.bFirstRun) {
 		// TODO: Be smart about same language, different country
-		auto& langValuesMapping = g_Config.GetLangValuesMapping();
+		auto &langValuesMapping = g_Config.GetLangValuesMapping();
 		auto iter = langValuesMapping.find(g_Config.sLanguageIni);
 		if (iter != langValuesMapping.end()) {
 			defaultLang = iter->second.second;
@@ -1127,14 +1126,14 @@ static ConfigSetting systemParamSettings[] = {
 	ConfigSetting("ParamTimeFormat", &g_Config.iTimeFormat, PSP_SYSTEMPARAM_TIME_FORMAT_24HR, true, true),
 	ConfigSetting("ParamDateFormat", &g_Config.iDateFormat, PSP_SYSTEMPARAM_DATE_FORMAT_YYYYMMDD, true, true),
 	ConfigSetting("TimeZone", &g_Config.iTimeZone, 0, true, true),
-	ConfigSetting("DayLightSavings", &g_Config.bDayLightSavings, (bool)PSP_SYSTEMPARAM_DAYLIGHTSAVINGS_STD, true, true),
+	ConfigSetting("DayLightSavings", &g_Config.bDayLightSavings, (bool) PSP_SYSTEMPARAM_DAYLIGHTSAVINGS_STD, true, true),
 	ReportedConfigSetting("ButtonPreference", &g_Config.iButtonPreference, PSP_SYSTEMPARAM_BUTTON_CROSS, true, true),
 	ConfigSetting("LockParentalLevel", &g_Config.iLockParentalLevel, 0, true, true),
 	ConfigSetting("WlanAdhocChannel", &g_Config.iWlanAdhocChannel, PSP_SYSTEMPARAM_ADHOC_CHANNEL_AUTOMATIC, true, true),
 #if defined(USING_WIN_UI) || defined(USING_QT_UI) || PPSSPP_PLATFORM(ANDROID)
 	ConfigSetting("BypassOSKWithKeyboard", &g_Config.bBypassOSKWithKeyboard, false, true, true),
 #endif
-	ConfigSetting("WlanPowerSave", &g_Config.bWlanPowerSave, (bool)PSP_SYSTEMPARAM_WLAN_POWERSAVE_OFF, true, true),
+	ConfigSetting("WlanPowerSave", &g_Config.bWlanPowerSave, (bool) PSP_SYSTEMPARAM_WLAN_POWERSAVE_OFF, true, true),
 	ReportedConfigSetting("EncryptSave", &g_Config.bEncryptSave, true, true, true),
 	ConfigSetting("SavedataUpgradeVersion", &g_Config.bSavedataUpgrade, true, true, false),
 	ConfigSetting("MemStickSize", &g_Config.iMemStickSizeGB, 16, true, false),
@@ -1224,9 +1223,9 @@ static ConfigSectionSettings sections[] = {
 	{"VR", vrSettings},
 };
 
-static void IterateSettings(IniFile& iniFile, std::function<void(Section* section, ConfigSetting* setting)> func) {
+static void IterateSettings(IniFile &iniFile, std::function<void(Section *section, ConfigSetting *setting)> func) {
 	for (size_t i = 0; i < ARRAY_SIZE(sections); ++i) {
-		Section* section = iniFile.GetOrCreateSection(sections[i].section);
+		Section *section = iniFile.GetOrCreateSection(sections[i].section);
 		for (auto setting = sections[i].settings; setting->HasMore(); ++setting) {
 			func(section, setting);
 		}
@@ -1279,8 +1278,8 @@ void Config::LoadLangValuesMapping() {
 	langCodeMapping["CHINESE_TRADITIONAL"] = PSP_SYSTEMPARAM_LANGUAGE_CHINESE_TRADITIONAL;
 	langCodeMapping["CHINESE_SIMPLIFIED"] = PSP_SYSTEMPARAM_LANGUAGE_CHINESE_SIMPLIFIED;
 
-	const Section* langRegionNames = mapping.GetOrCreateSection("LangRegionNames");
-	const Section* systemLanguage = mapping.GetOrCreateSection("SystemLanguage");
+	const Section *langRegionNames = mapping.GetOrCreateSection("LangRegionNames");
+	const Section *systemLanguage = mapping.GetOrCreateSection("SystemLanguage");
 
 	for (size_t i = 0; i < keys.size(); i++) {
 		std::string langName;
@@ -1294,7 +1293,7 @@ void Config::LoadLangValuesMapping() {
 	}
 }
 
-const std::map<std::string, std::pair<std::string, int>>& Config::GetLangValuesMapping() {
+const std::map<std::string, std::pair<std::string, int>> &Config::GetLangValuesMapping() {
 	if (langValuesMapping_.empty()) {
 		LoadLangValuesMapping();
 	}
@@ -1309,12 +1308,12 @@ void Config::Reload() {
 
 // Call this if you change the search path (such as when changing memstick directory. can't
 // really think of any other legit uses).
-void Config::UpdateIniLocation(const char* iniFileName, const char* controllerIniFilename) {
+void Config::UpdateIniLocation(const char *iniFileName, const char *controllerIniFilename) {
 	const bool useIniFilename = iniFileName != nullptr && strlen(iniFileName) > 0;
-	const char* ppssppIniFilename = IsVREnabled() ? "ppssppvr.ini" : "ppsspp.ini";
+	const char *ppssppIniFilename = IsVREnabled() ? "ppssppvr.ini" : "ppsspp.ini";
 	iniFilename_ = FindConfigFile(useIniFilename ? iniFileName : ppssppIniFilename);
 	const bool useControllerIniFilename = controllerIniFilename != nullptr && strlen(controllerIniFilename) > 0;
-	const char* controlsIniFilename = IsVREnabled() ? "controlsvr.ini" : "controls.ini";
+	const char *controlsIniFilename = IsVREnabled() ? "controlsvr.ini" : "controls.ini";
 	controllerIniFilename_ = FindConfigFile(useControllerIniFilename ? controllerIniFilename : controlsIniFilename);
 }
 
@@ -1325,10 +1324,10 @@ bool Config::LoadAppendedConfig() {
 		return false;
 	}
 
-	IterateSettings(iniFile, [&iniFile](Section* section, ConfigSetting* setting) {
+	IterateSettings(iniFile, [&iniFile](Section *section, ConfigSetting *setting) {
 		if (iniFile.Exists(section->name().c_str(), setting->iniKey_))
-		setting->Get(section);
-		});
+			setting->Get(section);
+	});
 
 	INFO_LOG(LOADER, "Loaded appended config '%s'.", appendedConfigFileName_.c_str());
 
@@ -1336,12 +1335,12 @@ bool Config::LoadAppendedConfig() {
 	return true;
 }
 
-void Config::SetAppendedConfigIni(const Path& path) {
+void Config::SetAppendedConfigIni(const Path &path) {
 	appendedConfigFileName_ = path;
 }
 
 
-void Config::Load(const char* iniFileName, const char* controllerIniFilename) {
+void Config::Load(const char *iniFileName, const char *controllerIniFilename) {
 	if (!bUpdatedInstanceCounter) {
 		InitInstanceCounter();
 		bUpdatedInstanceCounter = true;
@@ -1360,9 +1359,9 @@ void Config::Load(const char* iniFileName, const char* controllerIniFilename) {
 		// Continue anyway to initialize the config.
 	}
 
-	IterateSettings(iniFile, [](Section* section, ConfigSetting* setting) {
+	IterateSettings(iniFile, [](Section *section, ConfigSetting *setting) {
 		setting->Get(section);
-		});
+	});
 
 	iRunCount++;
 
@@ -1371,7 +1370,7 @@ void Config::Load(const char* iniFileName, const char* controllerIniFilename) {
 	if (!File::Exists(currentDirectory))
 		currentDirectory = defaultCurrentDirectory;
 
-	Section* log = iniFile.GetOrCreateSection(logSectionName);
+	Section *log = iniFile.GetOrCreateSection(logSectionName);
 
 	bool debugDefaults = false;
 #ifdef _DEBUG
@@ -1379,7 +1378,7 @@ void Config::Load(const char* iniFileName, const char* controllerIniFilename) {
 #endif
 	LogManager::GetInstance()->LoadConfig(log, debugDefaults);
 
-	Section* recent = iniFile.GetOrCreateSection("Recent");
+	Section *recent = iniFile.GetOrCreateSection("Recent");
 	recent->Get("MaxRecent", &iMaxRecent, 60);
 
 	// Fix issue from switching from uint (hex in .ini) to int (dec)
@@ -1406,7 +1405,7 @@ void Config::Load(const char* iniFileName, const char* controllerIniFilename) {
 	vPinnedPaths.clear();
 	for (auto it = pinnedPaths.begin(), end = pinnedPaths.end(); it != end; ++it) {
 		// Unpin paths that are deleted automatically.
-		const std::string& path = it->second;
+		const std::string &path = it->second;
 		if (startsWith(path, "http://") || startsWith(path, "https://") || File::Exists(Path(path))) {
 			vPinnedPaths.push_back(File::ResolvePath(path));
 		}
@@ -1414,8 +1413,8 @@ void Config::Load(const char* iniFileName, const char* controllerIniFilename) {
 
 	// Default values for post process shaders
 	bool postShadersInitialized = iniFile.HasSection("PostShaderList");
-	Section* postShaderChain = iniFile.GetOrCreateSection("PostShaderList");
-	Section* postShaderSetting = iniFile.GetOrCreateSection("PostShaderSetting");
+	Section *postShaderChain = iniFile.GetOrCreateSection("PostShaderList");
+	Section *postShaderSetting = iniFile.GetOrCreateSection("PostShaderSetting");
 	if (IsVREnabled() && !postShadersInitialized) {
 		postShaderChain->Set("PostShader1", "ColorCorrection");
 		postShaderSetting->Set("ColorCorrectionSettingCurrentValue1", 1.0f);
@@ -1438,14 +1437,14 @@ void Config::Load(const char* iniFileName, const char* controllerIniFilename) {
 	}
 
 	// Check for an old dpad setting
-	Section* control = iniFile.GetOrCreateSection("Control");
+	Section *control = iniFile.GetOrCreateSection("Control");
 	float f;
 	control->Get("DPadRadius", &f, 0.0f);
 	if (f > 0.0f) {
 		ResetControlLayout();
 	}
 
-	const char* gitVer = PPSSPP_GIT_VERSION;
+	const char *gitVer = PPSSPP_GIT_VERSION;
 	Version installed(gitVer);
 	Version upgrade(upgradeVersion);
 	const bool versionsValid = installed.IsValid() && upgrade.IsValid();
@@ -1462,8 +1461,8 @@ void Config::Load(const char* iniFileName, const char* controllerIniFilename) {
 	// splash screen quickly), but then we'll just show the notification next time instead, we store the
 	// upgrade number in the ini.
 	if (iRunCount % 10 == 0 && bCheckForNewVersion) {
-		const char* versionUrl = "http://www.ppsspp.org/version.json";
-		const char* acceptMime = "application/json, text/*; q=0.9, */*; q=0.8";
+		const char *versionUrl = "http://www.ppsspp.org/version.json";
+		const char *acceptMime = "application/json, text/*; q=0.9, */*; q=0.8";
 		auto dl = g_DownloadManager.StartDownloadWithCallback(versionUrl, Path(), &DownloadCompletedCallback, acceptMime);
 		dl->SetHidden(true);
 	}
@@ -1492,7 +1491,7 @@ void Config::Load(const char* iniFileName, const char* controllerIniFilename) {
 	INFO_LOG(LOADER, "Config loaded: '%s'", iniFilename_.c_str());
 }
 
-bool Config::Save(const char* saveReason) {
+bool Config::Save(const char *saveReason) {
 	if (!IsFirstInstance()) {
 		// TODO: Should we allow saving config if started from a different directory?
 		// How do we tell?
@@ -1516,13 +1515,13 @@ bool Config::Save(const char* saveReason) {
 		// Need to do this somewhere...
 		bFirstRun = false;
 
-		IterateSettings(iniFile, [&](Section* section, ConfigSetting* setting) {
+		IterateSettings(iniFile, [&](Section *section, ConfigSetting *setting) {
 			if (!bGameSpecific || !setting->perGame_) {
 				setting->Set(section);
 			}
-			});
+		});
 
-		Section* recent = iniFile.GetOrCreateSection("Recent");
+		Section *recent = iniFile.GetOrCreateSection("Recent");
 		recent->Set("MaxRecent", iMaxRecent);
 
 		private_->ResetRecentIsosThread();
@@ -1532,13 +1531,12 @@ bool Config::Save(const char* saveReason) {
 			std::lock_guard<std::mutex> guard(private_->recentIsosLock);
 			if (i < (int)recentIsos.size()) {
 				recent->Set(keyName, recentIsos[i]);
-			}
-			else {
+			} else {
 				recent->Delete(keyName); // delete the nonexisting FileName
 			}
 		}
 
-		Section* pinnedPaths = iniFile.GetOrCreateSection("PinnedPaths");
+		Section *pinnedPaths = iniFile.GetOrCreateSection("PinnedPaths");
 		pinnedPaths->Clear();
 		for (size_t i = 0; i < vPinnedPaths.size(); ++i) {
 			char keyName[64];
@@ -1547,24 +1545,24 @@ bool Config::Save(const char* saveReason) {
 		}
 
 		if (!bGameSpecific) {
-			Section* postShaderSetting = iniFile.GetOrCreateSection("PostShaderSetting");
+			Section *postShaderSetting = iniFile.GetOrCreateSection("PostShaderSetting");
 			postShaderSetting->Clear();
 			for (auto it = mPostShaderSetting.begin(), end = mPostShaderSetting.end(); it != end; ++it) {
 				postShaderSetting->Set(it->first.c_str(), it->second);
 			}
-			Section* postShaderChain = iniFile.GetOrCreateSection("PostShaderList");
+			Section *postShaderChain = iniFile.GetOrCreateSection("PostShaderList");
 			postShaderChain->Clear();
 			for (size_t i = 0; i < vPostShaderNames.size(); ++i) {
 				char keyName[64];
-				snprintf(keyName, sizeof(keyName), "PostShader%d", (int)i + 1);
+				snprintf(keyName, sizeof(keyName), "PostShader%d", (int)i+1);
 				postShaderChain->Set(keyName, vPostShaderNames[i]);
 			}
 		}
 
-		Section* control = iniFile.GetOrCreateSection("Control");
+		Section *control = iniFile.GetOrCreateSection("Control");
 		control->Delete("DPadRadius");
 
-		Section* log = iniFile.GetOrCreateSection(logSectionName);
+		Section *log = iniFile.GetOrCreateSection(logSectionName);
 		if (LogManager::GetInstance())
 			LogManager::GetInstance()->SaveConfig(log);
 
@@ -1589,8 +1587,7 @@ bool Config::Save(const char* saveReason) {
 		}
 
 		PostSaveCleanup(false);
-	}
-	else {
+	} else {
 		INFO_LOG(LOADER, "Not saving config");
 	}
 
@@ -1648,7 +1645,7 @@ void Config::PostSaveCleanup(bool gameSpecific) {
 #define PPSSPP_GIT_VERSION "v0.0.1-gaaaaaaaaa"
 #endif
 
-void Config::DownloadCompletedCallback(http::Download& download) {
+void Config::DownloadCompletedCallback(http::Download &download) {
 	if (download.ResultCode() != 200) {
 		ERROR_LOG(LOADER, "Failed to download %s: %d", download.url().c_str(), download.ResultCode());
 		return;
@@ -1669,7 +1666,7 @@ void Config::DownloadCompletedCallback(http::Download& download) {
 
 	std::string version = root.getString("version", "");
 
-	const char* gitVer = PPSSPP_GIT_VERSION;
+	const char *gitVer = PPSSPP_GIT_VERSION;
 	Version installed(gitVer);
 	Version upgrade(version);
 	Version dismissed(g_Config.dismissedVersion);
@@ -1702,7 +1699,7 @@ void Config::DismissUpgrade() {
 	g_Config.dismissedVersion = g_Config.upgradeVersion;
 }
 
-void Config::AddRecent(const std::string& file) {
+void Config::AddRecent(const std::string &file) {
 	// Don't bother with this if the user disabled recents (it's -1).
 	if (iMaxRecent <= 0)
 		return;
@@ -1718,7 +1715,7 @@ void Config::AddRecent(const std::string& file) {
 		recentIsos.resize(iMaxRecent);
 }
 
-void Config::RemoveRecent(const std::string& file) {
+void Config::RemoveRecent(const std::string &file) {
 	// Don't bother with this if the user disabled recents (it's -1).
 	if (iMaxRecent <= 0)
 		return;
@@ -1731,8 +1728,7 @@ void Config::RemoveRecent(const std::string& file) {
 		if (filename == recent) {
 			// Note that the increment-erase idiom doesn't work with vectors.
 			iter = recentIsos.erase(iter);
-		}
-		else {
+		} else {
 			iter++;
 		}
 	}
@@ -1742,39 +1738,39 @@ void Config::CleanRecent() {
 	private_->SetRecentIsosThread([this] {
 		SetCurrentThreadName("RecentISOs");
 
-	AndroidJNIThreadContext jniContext;  // destructor detaches
+		AndroidJNIThreadContext jniContext;  // destructor detaches
 
-	double startTime = time_now_d();
+		double startTime = time_now_d();
 
-	std::lock_guard<std::mutex> guard(private_->recentIsosLock);
-	std::vector<std::string> cleanedRecent;
-	for (size_t i = 0; i < recentIsos.size(); i++) {
-		bool exists = false;
-		Path path = Path(recentIsos[i]);
-		switch (path.Type()) {
-		case PathType::CONTENT_URI:
-		case PathType::NATIVE:
-			exists = File::Exists(path);
-			break;
-		default:
-			FileLoader* loader = ConstructFileLoader(path);
-			exists = loader->ExistsFast();
-			delete loader;
-			break;
-		}
+		std::lock_guard<std::mutex> guard(private_->recentIsosLock);
+		std::vector<std::string> cleanedRecent;
+		for (size_t i = 0; i < recentIsos.size(); i++) {
+			bool exists = false;
+			Path path = Path(recentIsos[i]);
+			switch (path.Type()) {
+			case PathType::CONTENT_URI:
+			case PathType::NATIVE:
+				exists = File::Exists(path);
+				break;
+			default:
+				FileLoader *loader = ConstructFileLoader(path);
+				exists = loader->ExistsFast();
+				delete loader;
+				break;
+			}
 
-		if (exists) {
-			// Make sure we don't have any redundant items.
-			auto duplicate = std::find(cleanedRecent.begin(), cleanedRecent.end(), recentIsos[i]);
-			if (duplicate == cleanedRecent.end()) {
-				cleanedRecent.push_back(recentIsos[i]);
+			if (exists) {
+				// Make sure we don't have any redundant items.
+				auto duplicate = std::find(cleanedRecent.begin(), cleanedRecent.end(), recentIsos[i]);
+				if (duplicate == cleanedRecent.end()) {
+					cleanedRecent.push_back(recentIsos[i]);
+				}
 			}
 		}
-	}
 
-	INFO_LOG(SYSTEM, "CleanRecent took %0.2f", time_now_d() - startTime);
-	recentIsos = cleanedRecent;
-		});
+		INFO_LOG(SYSTEM, "CleanRecent took %0.2f", time_now_d() - startTime);
+		recentIsos = cleanedRecent;
+	});
 }
 
 std::vector<std::string> Config::RecentIsos() const {
@@ -1791,11 +1787,11 @@ void Config::ClearRecentIsos() {
 	recentIsos.clear();
 }
 
-void Config::SetSearchPath(const Path& searchPath) {
+void Config::SetSearchPath(const Path &searchPath) {
 	searchPath_ = searchPath;
 }
 
-const Path Config::FindConfigFile(const std::string& baseFilename) {
+const Path Config::FindConfigFile(const std::string &baseFilename) {
 	// Don't search for an absolute path.
 	if (baseFilename.size() > 1 && baseFilename[0] == '/') {
 		return Path(baseFilename);
@@ -1824,8 +1820,7 @@ void Config::RestoreDefaults() {
 	if (bGameSpecific) {
 		deleteGameConfig(gameId_);
 		createGameConfig(gameId_);
-	}
-	else {
+	} else {
 		if (File::Exists(iniFilename_))
 			File::Delete(iniFilename_);
 		ClearRecentIsos();
@@ -1834,12 +1829,12 @@ void Config::RestoreDefaults() {
 	Load();
 }
 
-bool Config::hasGameConfig(const std::string& pGameId) {
+bool Config::hasGameConfig(const std::string &pGameId) {
 	Path fullIniFilePath = getGameConfigFile(pGameId);
 	return File::Exists(fullIniFilePath);
 }
 
-void Config::changeGameSpecific(const std::string& pGameId, const std::string& title) {
+void Config::changeGameSpecific(const std::string &pGameId, const std::string &title) {
 	if (!reload_)
 		Save("changeGameSpecific");
 	gameId_ = pGameId;
@@ -1847,7 +1842,7 @@ void Config::changeGameSpecific(const std::string& pGameId, const std::string& t
 	bGameSpecific = !pGameId.empty();
 }
 
-bool Config::createGameConfig(const std::string& pGameId) {
+bool Config::createGameConfig(const std::string &pGameId) {
 	Path fullIniFilePath = getGameConfigFile(pGameId);
 
 	if (hasGameConfig(pGameId)) {
@@ -1865,15 +1860,15 @@ bool Config::deleteGameConfig(const std::string& pGameId) {
 	return true;
 }
 
-Path Config::getGameConfigFile(const std::string& pGameId) {
-	const char* ppssppIniFilename = IsVREnabled() ? "_ppssppvr.ini" : "_ppsspp.ini";
+Path Config::getGameConfigFile(const std::string &pGameId) {
+	const char *ppssppIniFilename = IsVREnabled() ? "_ppssppvr.ini" : "_ppsspp.ini";
 	std::string iniFileName = pGameId + ppssppIniFilename;
 	Path iniFileNameFull = FindConfigFile(iniFileName);
 
 	return iniFileNameFull;
 }
 
-bool Config::saveGameConfig(const std::string& pGameId, const std::string& title) {
+bool Config::saveGameConfig(const std::string &pGameId, const std::string &title) {
 	if (pGameId.empty()) {
 		return false;
 	}
@@ -1882,28 +1877,28 @@ bool Config::saveGameConfig(const std::string& pGameId, const std::string& title
 
 	IniFile iniFile;
 
-	Section* top = iniFile.GetOrCreateSection("");
+	Section *top = iniFile.GetOrCreateSection("");
 	top->AddComment(StringFromFormat("Game config for %s - %s", pGameId.c_str(), title.c_str()));
 
 	PreSaveCleanup(true);
 
-	IterateSettings(iniFile, [](Section* section, ConfigSetting* setting) {
+	IterateSettings(iniFile, [](Section *section, ConfigSetting *setting) {
 		if (setting->perGame_) {
 			setting->Set(section);
 		}
-		});
+	});
 
-	Section* postShaderSetting = iniFile.GetOrCreateSection("PostShaderSetting");
+	Section *postShaderSetting = iniFile.GetOrCreateSection("PostShaderSetting");
 	postShaderSetting->Clear();
 	for (auto it = mPostShaderSetting.begin(), end = mPostShaderSetting.end(); it != end; ++it) {
 		postShaderSetting->Set(it->first.c_str(), it->second);
 	}
 
-	Section* postShaderChain = iniFile.GetOrCreateSection("PostShaderList");
+	Section *postShaderChain = iniFile.GetOrCreateSection("PostShaderList");
 	postShaderChain->Clear();
 	for (size_t i = 0; i < vPostShaderNames.size(); ++i) {
 		char keyName[64];
-		snprintf(keyName, sizeof(keyName), "PostShader%d", (int)i + 1);
+		snprintf(keyName, sizeof(keyName), "PostShader%d", (int)i+1);
 		postShaderChain->Set(keyName, vPostShaderNames[i]);
 	}
 
@@ -1914,7 +1909,7 @@ bool Config::saveGameConfig(const std::string& pGameId, const std::string& title
 	return true;
 }
 
-bool Config::loadGameConfig(const std::string& pGameId, const std::string& title) {
+bool Config::loadGameConfig(const std::string &pGameId, const std::string &title) {
 	Path iniFileNameFull = getGameConfigFile(pGameId);
 
 	if (!hasGameConfig(pGameId)) {
@@ -1928,12 +1923,11 @@ bool Config::loadGameConfig(const std::string& pGameId, const std::string& title
 
 	auto postShaderSetting = iniFile.GetOrCreateSection("PostShaderSetting")->ToMap();
 	mPostShaderSetting.clear();
-	for (const auto& it : postShaderSetting) {
+	for (const auto &it : postShaderSetting) {
 		float value = 0.0f;
 		if (sscanf(it.second.c_str(), "%f", &value)) {
 			mPostShaderSetting[it.first] = value;
-		}
-		else {
+		} else {
 			WARN_LOG(LOADER, "Invalid float value string for param %s: '%s'", it.first.c_str(), it.second.c_str());
 		}
 	}
@@ -1945,15 +1939,15 @@ bool Config::loadGameConfig(const std::string& pGameId, const std::string& title
 			vPostShaderNames.push_back(it.second);
 	}
 
-	IterateSettings(iniFile, [](Section* section, ConfigSetting* setting) {
+	IterateSettings(iniFile, [](Section *section, ConfigSetting *setting) {
 		if (setting->perGame_) {
 			setting->Get(section);
 		}
-		});
+	});
 
 	KeyMap::LoadFromIni(iniFile);
-
-	if (!appendedConfigFileName_.ToString().empty() &&
+	
+	if (!appendedConfigFileName_.ToString().empty() && 
 		std::find(appendedConfigUpdatedGames_.begin(), appendedConfigUpdatedGames_.end(), pGameId) == appendedConfigUpdatedGames_.end()) {
 
 		LoadAppendedConfig();
@@ -1972,11 +1966,11 @@ void Config::unloadGameConfig() {
 		iniFile.Load(iniFilename_);
 
 		// Reload game specific settings back to standard.
-		IterateSettings(iniFile, [](Section* section, ConfigSetting* setting) {
+		IterateSettings(iniFile, [](Section *section, ConfigSetting *setting) {
 			if (setting->perGame_) {
 				setting->Get(section);
 			}
-			});
+		});
 
 		auto postShaderSetting = iniFile.GetOrCreateSection("PostShaderSetting")->ToMap();
 		mPostShaderSetting.clear();
@@ -2001,15 +1995,14 @@ void Config::LoadStandardControllerIni() {
 	if (!controllerIniFile.Load(controllerIniFilename_)) {
 		ERROR_LOG(LOADER, "Failed to read %s. Setting controller config to default.", controllerIniFilename_.c_str());
 		KeyMap::RestoreDefault();
-	}
-	else {
+	} else {
 		// Continue anyway to initialize the config. It will just restore the defaults.
 		KeyMap::LoadFromIni(controllerIniFile);
 	}
 }
 
 void Config::ResetControlLayout() {
-	auto reset = [](ConfigTouchPos& pos) {
+	auto reset = [](ConfigTouchPos &pos) {
 		pos.x = defaultTouchPosShow.x;
 		pos.y = defaultTouchPosShow.y;
 		pos.scale = defaultTouchPosShow.scale;
@@ -2039,7 +2032,7 @@ void Config::ResetControlLayout() {
 	g_Config.fRightStickHeadScale = 1.0f;
 }
 
-void Config::GetReportingInfo(UrlEncoder& data) {
+void Config::GetReportingInfo(UrlEncoder &data) {
 	for (size_t i = 0; i < ARRAY_SIZE(sections); ++i) {
 		const std::string prefix = std::string("config.") + sections[i].section;
 		for (auto setting = sections[i].settings; setting->HasMore(); ++setting) {

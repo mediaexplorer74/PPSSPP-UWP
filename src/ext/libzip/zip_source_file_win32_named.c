@@ -32,6 +32,7 @@
 */
 
 #include "zip_source_file_win32.h"
+#include <sysinfoapi.h>
 
 static zip_int64_t _zip_win32_named_op_commit_write(zip_source_file_context_t *ctx);
 static zip_int64_t _zip_win32_named_op_create_temp_output(zip_source_file_context_t *ctx);
@@ -122,7 +123,11 @@ _zip_win32_named_op_create_temp_output(zip_source_file_context_t *ctx) {
  #ifndef MS_UWP
     value = GetTickCount();
 #else
+#ifdef _M_ARM
+	 value = GetTickCount();
+#else
     value = (zip_uint32_t)(GetTickCount64() & 0xffffffff);
+#endif
 #endif
     
     if ((tempname = file_ops->allocate_tempname(ctx->fname, 10, &tempname_size)) == NULL) {

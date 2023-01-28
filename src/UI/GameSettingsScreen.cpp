@@ -427,6 +427,12 @@ void GameSettingsScreen::CreateViews() {
 		return UI::EVENT_CONTINUE;
 	});
 
+	graphicsSettings->Add(new ItemHeader(gr->T("Advanced Memory")));
+	CheckBox* executeWriteResolver = graphicsSettings->Add(new CheckBox(&g_Config.bExecuteWriteResolver, gr->T("Execute & Write resolver")));
+	executeWriteResolver->SetDisabledPtr(&g_Config.bSoftwareRendering);
+	executeWriteResolver->SetEnabled(!PSP_IsInited());
+	CheckBox* fastLoopRender = graphicsSettings->Add(new CheckBox(&g_Config.bFastLoop, gr->T("Fast loop render")));
+
 	graphicsSettings->Add(new ItemHeader(gr->T("Performance")));
 	CheckBox *frameDuplication = graphicsSettings->Add(new CheckBox(&g_Config.bRenderDuplicateFrames, gr->T("Render duplicate frames to 60hz")));
 	frameDuplication->OnClick.Add([=](EventParams &e) {

@@ -64,6 +64,16 @@
     <ClCompile Include="UWPHost.cpp" />
     <ClCompile Include="..\Windows\XinputDevice.cpp" />
     <ClCompile Include="..\Windows\InputDevice.cpp" />
+    <ClCompile Include="UWPHelpers\PPSSPPTypesHelpers.cpp" />
+    <ClCompile Include="UWPHelpers\StorageAccess.cpp" />
+    <ClCompile Include="UWPHelpers\StorageAsync.cpp" />
+    <ClCompile Include="UWPHelpers\StorageExtensions.cpp" />
+    <ClCompile Include="UWPHelpers\StorageHandler.cpp" />
+    <ClCompile Include="UWPHelpers\StorageManager.cpp" />
+    <ClCompile Include="UWPHelpers\StoragePath.cpp" />
+    <ClCompile Include="UWPHelpers\StoragePickers.cpp" />
+    <ClCompile Include="UWPHelpers\UIHelpers.cpp" />
+    <ClCompile Include="UWPHelpers\UWP2C.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.h" />
@@ -76,6 +86,22 @@
     <ClInclude Include="..\Windows\XinputDevice.h" />
     <ClInclude Include="UWPUtil.h" />
     <ClInclude Include="..\Windows\InputDevice.h" />
+    <ClInclude Include="UWPHelpers\PPSSPPTypesHelpers.h" />
+    <ClInclude Include="UWPHelpers\StorageAccess.h" />
+    <ClInclude Include="UWPHelpers\StorageAsync.h" />
+    <ClInclude Include="UWPHelpers\StorageConfig.h" />
+    <ClInclude Include="UWPHelpers\StorageExtensions.h" />
+    <ClInclude Include="UWPHelpers\StorageFileW.h" />
+    <ClInclude Include="UWPHelpers\StorageFolderW.h" />
+    <ClInclude Include="UWPHelpers\StorageHandler.h" />
+    <ClInclude Include="UWPHelpers\StorageInfo.h" />
+    <ClInclude Include="UWPHelpers\StorageItemW.h" />
+    <ClInclude Include="UWPHelpers\StorageLog.h" />
+    <ClInclude Include="UWPHelpers\StorageManager.h" />
+    <ClInclude Include="UWPHelpers\StoragePath.h" />
+    <ClInclude Include="UWPHelpers\StoragePickers.h" />
+    <ClInclude Include="UWPHelpers\UIHelpers.h" />
+    <ClInclude Include="UWPHelpers\UWP2C.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\StoreLogo.png">
@@ -348,18 +374,12 @@
     <None Include="Content\shaders\videoAA.fsh">
       <Filter>Content\shaders</Filter>
     </None>
-    <None Include="..\assets\ppge_atlas.meta">
-      <Filter>Content</Filter>
-    </None>
-    <None Include="..\assets\ui_atlas.meta">
-      <Filter>Content</Filter>
-    </None>
-    <None Include="..\assets\themes\defaultthemes.ini">
-      <Filter>Content\themes</Filter>
-    </None>
     <None Include="Content\asciifont_atlas.meta">
       <Filter>Content</Filter>
     </None>
+    <None Include="Content\themes\defaultthemes.ini" />
+    <None Include="Content\ppge_atlas.meta" />
+    <None Include="Content\ui_atlas.meta" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Content\gamecontrollerdb.txt">
@@ -370,5 +390,12 @@
     <Font Include="Content\Roboto-Condensed.ttf">
       <Filter>Content</Filter>
     </Font>
+  </ItemGroup>
+  <ItemGroup>
+    <Media Include="Content\sfx_back.wav" />
+    <Media Include="Content\sfx_confirm.wav" />
+    <Media Include="Content\sfx_select.wav" />
+    <Media Include="Content\sfx_toggle_off.wav" />
+    <Media Include="Content\sfx_toggle_on.wav" />
   </ItemGroup>
 </Project>

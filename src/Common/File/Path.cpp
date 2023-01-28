@@ -11,6 +11,7 @@
 
 #include "android/jni/app-android.h"
 #include "android/jni/AndroidContentURI.h"
+#include "UWP/UWPHelpers/StorageManager.h"
 
 #if HOST_IS_CASE_SENSITIVE
 #include <dirent.h>

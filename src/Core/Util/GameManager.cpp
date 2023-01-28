@@ -49,7 +49,7 @@
 #include "Common/Data/Text/I18n.h"
 
 #if PPSSPP_PLATFORM(UWP) && !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
-#include "UWP/UWPHelpers/StorageManager.h";
+#include "UWP/UWPHelpers/StorageManager.h"
 #endif
 
 GameManager g_GameManager;

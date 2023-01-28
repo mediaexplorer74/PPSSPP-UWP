@@ -79,8 +79,11 @@ protected:
 };
 
 class D3D11PushBuffer;
-
+#ifdef _M_ARM
+__declspec(align(16)) class ShaderManagerD3D11 : public ShaderManagerCommon {
+#else
 class ShaderManagerD3D11 : public ShaderManagerCommon {
+#endif
 public:
 	ShaderManagerD3D11(Draw::DrawContext *draw, ID3D11Device *device, ID3D11DeviceContext *context, D3D_FEATURE_LEVEL featureLevel);
 	~ShaderManagerD3D11();
@@ -103,6 +106,18 @@ public:
 	bool IsBaseDirty() { return true; }
 	bool IsLightDirty() { return true; }
 	bool IsBoneDirty() { return true; }
+
+#ifdef _M_ARM
+	void* operator new(size_t i)
+	{
+		return _mm_malloc(i, 16);
+	}
+
+	void operator delete(void* p)
+	{
+		_mm_free(p);
+	}
+#endif
 
 private:
 	void Clear();

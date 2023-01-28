@@ -118,10 +118,10 @@ std::string GetMusicFolder() {
 }
 std::string GetPreviewPath(std::string path) {
 	std::string pathView = path;
-	if (isChild(GetLocalFolder(), path)) {
-		pathView = "App Local Data";
-	}
-
+	windowsPath(pathView);
+	replace(pathView, GetLocalFolder(), "LocalState");
+	replace(pathView, GetTempFolder(), "TempState");
+	replace(pathView, GetInstallationFolder(), "Installation folder");
 	return pathView;
 }
 #pragma endregion
@@ -562,7 +562,7 @@ bool CopyUWP(std::string path, std::string dest) {
 			auto dstStorageItem = GetStorageItem(destDir, true, true);
 			if (dstStorageItem.IsValid()) {
 				DEBUG_LOG(FILESYS, "Copy (%s) to (%s)", path.c_str(), dest.c_str());
-				srcStorageItem.Copy(dstStorageItem, dstName);
+				state = srcStorageItem.Copy(dstStorageItem, dstName);
 			}
 			else {
 				ERROR_LOG(FILESYS, "Couldn't find or access (%s)", dest.c_str());
@@ -592,7 +592,7 @@ bool MoveUWP(std::string path, std::string dest) {
 			auto dstStorageItem = GetStorageItem(destDir, true, true);
 			if (dstStorageItem.IsValid()) {
 				DEBUG_LOG(FILESYS, "Move (%s) to (%s)", path.c_str(), dest.c_str());
-				srcStorageItem.Move(dstStorageItem, dstName);
+				state = srcStorageItem.Move(dstStorageItem, dstName);
 			}
 			else {
 				ERROR_LOG(FILESYS, "Couldn't find or access (%s)", dest.c_str());
@@ -616,7 +616,7 @@ bool RenameUWP(std::string path, std::string name) {
 		auto srcStorageItem = GetStorageItem(path);
 		if (srcStorageItem.IsValid()) {
 			DEBUG_LOG(FILESYS, "Rename (%s) to (%s)", path.c_str(), name.c_str());
-			srcStorageItem.Rename(name);
+			state = srcStorageItem.Rename(name);
 		}
 		else {
 			DEBUG_LOG(FILESYS, "Couldn't find or access (%s)", path.c_str());

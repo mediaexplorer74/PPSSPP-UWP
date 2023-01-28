@@ -25,6 +25,7 @@
 #include "Common/MemoryUtil.h"
 #include "Common/StringUtils.h"
 #include "Common/SysError.h"
+#include "Core/Config.h"
 
 #ifdef _WIN32
 #include "Common/CommonWindows.h"
@@ -118,6 +119,57 @@ static void *SearchForFreeMem(size_t size) {
 }
 #endif
 
+#include <map>
+std::map<void*, std::pair<size_t, bool>> execMem;
+auto FindExecRegion(void* ptr)
+{
+	UINT_PTR iptr = (UINT_PTR)ptr;
+	for (const auto& iter : execMem)
+	{
+		UINT_PTR imem = (UINT_PTR)iter.first;
+		if (iptr >= imem && iptr < imem + iter.second.first)
+			return std::make_pair(iter.first, iter.second.first);
+	}
+
+	return std::make_pair((void*)nullptr, size_t(0));
+}
+void MakeExecutable(void* ptr, size_t size)
+{
+	if (g_Config.bExecuteWriteResolver && !g_Config.bSoftwareRendering) {
+		if (ptr == nullptr || size == 0)
+		{
+			ERROR_LOG(COMMON, "MakeExecutable failed, ptr is null");
+			return;
+		}
+		ULONG oldProtection;
+		auto result = VirtualProtectFromApp(ptr, size, PAGE_EXECUTE_READ, &oldProtection);
+		if (result == FALSE)
+		{
+			ERROR_LOG(COMMON, "VirtualProtectFromApp failed");
+		}
+		isMemoryWriting = false;
+	}
+}
+
+void MakeModifiable(void* ptr, size_t size)
+{
+	if (g_Config.bExecuteWriteResolver && !g_Config.bSoftwareRendering) {
+		if (ptr == nullptr || size == 0)
+		{
+			ERROR_LOG(COMMON, "MakeModifiable failed, ptr is null");
+			return;
+		}
+		
+		isMemoryWriting = true;
+		ULONG oldProtection;
+		auto result = VirtualProtectFromApp(ptr, size, PAGE_READWRITE, &oldProtection);
+		if (result == FALSE)
+		{
+			ERROR_LOG(COMMON, "VirtualProtectFromApp failed");
+		}
+	}
+}
+
 // This is purposely not a full wrapper for virtualalloc/mmap, but it
 // provides exactly the primitive operations that PPSSPP needs.
 void *AllocateExecutableMemory(size_t size) {
@@ -152,7 +204,29 @@ void *AllocateExecutableMemory(size_t size) {
 #endif
 	{
 #if PPSSPP_PLATFORM(UWP)
-		ptr = VirtualAllocFromApp(0, size, MEM_RESERVE | MEM_COMMIT, prot);
+		if (g_Config.bExecuteWriteResolver && !g_Config.bSoftwareRendering) {
+			ptr = VirtualAllocFromApp(0, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+			if (ptr)
+			{
+				execMem[ptr].first = size;
+				execMem[ptr].second = false;
+			}
+			else {
+				ERROR_LOG(COMMON, "VirtualAllocFromApp failed");
+			}
+
+			if (ptr) {
+				ULONG oldProtection;
+				auto result = VirtualProtectFromApp(ptr, size, PAGE_EXECUTE_READ, &oldProtection);
+				if (result == FALSE)
+				{
+					ERROR_LOG(COMMON, "VirtualProtectFromApp failed");
+				}
+			}
+		}
+		else {
+			ptr = VirtualAllocFromApp(0, size, MEM_RESERVE | MEM_COMMIT, prot);
+		}
 #else
 		ptr = VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT, prot);
 #endif
@@ -255,6 +329,11 @@ void *AllocateAlignedMemory(size_t size, size_t alignment) {
 void FreeMemoryPages(void *ptr, size_t size) {
 	if (!ptr)
 		return;
+
+	if (g_Config.bExecuteWriteResolver && !g_Config.bSoftwareRendering) {
+		execMem.erase(ptr);
+	}
+
 	uintptr_t page_size = GetMemoryProtectPageSize();
 	size = (size + page_size - 1) & (~(page_size - 1));
 #ifdef _WIN32
@@ -269,6 +348,7 @@ void FreeMemoryPages(void *ptr, size_t size) {
 void FreeAlignedMemory(void* ptr) {
 	if (!ptr)
 		return;
+
 #ifdef _WIN32
 	_aligned_free(ptr);
 #else

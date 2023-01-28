@@ -289,7 +289,6 @@ JittedVertexDecoder VertexDecoderJitCache::Compile(const VertexDecoder &dec, int
 	dec.ToString(temp);
 	INFO_LOG(G3D, "%s", temp);
 	*/
-
 	*jittedSize = GetCodePtr() - start;
 	EndWrite();
 	return (JittedVertexDecoder)start;

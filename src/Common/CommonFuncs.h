@@ -83,5 +83,5 @@ inline u64 __rotr64(u64 x, unsigned int shift){
 	#define ftello _ftelli64
 	#define atoll _atoi64
 #endif
-	#define Crash() {__debugbreak();}
+	#define Crash() {}
 #endif // WIN32 ndef

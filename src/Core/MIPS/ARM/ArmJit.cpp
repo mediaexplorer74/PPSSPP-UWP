@@ -111,6 +111,7 @@ ArmJit::ArmJit(MIPSState *mipsState) : blocks(mipsState, this), gpr(mipsState, &
 	blocks.Init();
 	gpr.SetEmitter(this);
 	fpr.SetEmitter(this);
+	//MemoryAccess macc(region, region_size);
 	AllocCodeSpace(1024 * 1024 * 16);  // 32MB is the absolute max because that's what an ARM branch instruction can reach, backwards and forwards.
 	GenerateFixedCode();
 
@@ -233,7 +234,7 @@ void ArmJit::Compile(u32 em_address) {
 	if (GetSpaceLeft() < 0x10000 || blocks.IsFull()) {
 		ClearCache();
 	}
-
+	MemoryAccess macc(GetCodePtr(), JitBlockCache::MAX_BLOCK_INSTRUCTIONS * 16);
 	BeginWrite(JitBlockCache::MAX_BLOCK_INSTRUCTIONS * 16);
 
 	int block_num = blocks.AllocateBlock(em_address);
@@ -434,11 +435,15 @@ void ArmJit::Comp_RunBlock(MIPSOpcode op)
 }
 
 void ArmJit::LinkBlock(u8 *exitPoint, const u8 *checkedEntry) {
-	if (PlatformIsWXExclusive()) {
-		ProtectMemoryPages(exitPoint, 32, MEM_PROT_READ | MEM_PROT_WRITE);
+	if (!g_Config.bExecuteWriteResolver || g_Config.bSoftwareRendering) {
+		if (PlatformIsWXExclusive()) {
+			ProtectMemoryPages(exitPoint, 32, MEM_PROT_READ | MEM_PROT_WRITE);
+		}
 	}
 
 	ARMXEmitter emit(exitPoint);
+	MemoryAccess macc(exitPoint, 32);
+
 	u32 op = *((const u32 *)emit.GetCodePointer());
 	bool prelinked = (op & 0xFF000000) == 0xEA000000;
 	// Jump directly to the block, yay.
@@ -454,26 +459,34 @@ void ArmJit::LinkBlock(u8 *exitPoint, const u8 *checkedEntry) {
 		} while ((op & 0xFF000000) != 0xEA000000 && (op & 0xFFF000F0) != 0xE1200070);
 	}
 	emit.FlushIcache();
-	if (PlatformIsWXExclusive()) {
-		ProtectMemoryPages(exitPoint, 32, MEM_PROT_READ | MEM_PROT_EXEC);
+	if (!g_Config.bExecuteWriteResolver || g_Config.bSoftwareRendering) {
+		if (PlatformIsWXExclusive()) {
+			ProtectMemoryPages(exitPoint, 32, MEM_PROT_READ | MEM_PROT_EXEC);
+		}
 	}
 }
 
 void ArmJit::UnlinkBlock(u8 *checkedEntry, u32 originalAddress) {
-	if (PlatformIsWXExclusive()) {
-		ProtectMemoryPages(checkedEntry, 16, MEM_PROT_READ | MEM_PROT_WRITE);
+	if (!g_Config.bExecuteWriteResolver || g_Config.bSoftwareRendering) {
+		if (PlatformIsWXExclusive()) {
+			ProtectMemoryPages(checkedEntry, 16, MEM_PROT_READ | MEM_PROT_WRITE);
+		}
 	}
 	// Send anyone who tries to run this block back to the dispatcher.
 	// Not entirely ideal, but .. pretty good.
 	// I hope there's enough space...
 	// checkedEntry is the only "linked" entrance so it's enough to overwrite that.
 	ARMXEmitter emit(checkedEntry);
+	MemoryAccess macc(checkedEntry, 16);
+
 	emit.MOVI2R(R0, originalAddress);
 	emit.STR(R0, CTXREG, offsetof(MIPSState, pc));
 	emit.B(MIPSComp::jit->GetDispatcher());
 	emit.FlushIcache();
-	if (PlatformIsWXExclusive()) {
-		ProtectMemoryPages(checkedEntry, 16, MEM_PROT_READ | MEM_PROT_EXEC);
+	if (!g_Config.bExecuteWriteResolver || g_Config.bSoftwareRendering) {
+		if (PlatformIsWXExclusive()) {
+			ProtectMemoryPages(checkedEntry, 16, MEM_PROT_READ | MEM_PROT_EXEC);
+		}
 	}
 }
 
