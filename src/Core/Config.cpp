@@ -881,11 +881,13 @@ static ConfigSetting graphicsSettings[] = {
 	ConfigSetting("MultiSampleLevel", &g_Config.iMultiSampleLevel, 0, true, true),  // Number of samples is 1 << iMultiSampleLevel
 
 	ReportedConfigSetting("VertexDecCache", &g_Config.bVertexCache, false, true, true),
-#ifdef _M_ARM
+#if 0
 	ReportedConfigSetting("ExecuteWriteResolver", &g_Config.bExecuteWriteResolver, true, true, true),
+	ReportedConfigSetting("LegacyHandle", &g_Config.bLegacyHandlerReady, true, true, true),
 	ReportedConfigSetting("FastLoop", &g_Config.bFastLoop, false, true, true),
 #else
-	ReportedConfigSetting("ExecuteWriteResolver", &g_Config.bExecuteWriteResolver, false, true, true),
+	//ReportedConfigSetting("ExecuteWriteResolver", &g_Config.bExecuteWriteResolver, false, true, true),
+	//ReportedConfigSetting("LegacyHandle", &g_Config.bLegacyHandlerReady, true, true, true),
 	ReportedConfigSetting("FastLoop", &g_Config.bFastLoop, true, true, true),
 #endif
 	ReportedConfigSetting("TextureBackoffCache", &g_Config.bTextureBackoffCache, true, true, true),

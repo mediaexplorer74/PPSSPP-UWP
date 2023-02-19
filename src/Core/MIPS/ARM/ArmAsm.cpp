@@ -71,8 +71,6 @@ namespace MIPSComp {
 using namespace ArmJitConstants;
 
 void ArmJit::GenerateFixedCode() {
-	MemoryAccess macc(GetCodePtr(), GetMemoryProtectPageSize());
-	BeginWrite(GetMemoryProtectPageSize());
 	const u8 *start = AlignCodePage();
 
 	// LR == SCRATCHREG2 on ARM32 so it needs to be pushed.
@@ -268,7 +266,6 @@ void ArmJit::GenerateFixedCode() {
 
 	// Let's spare the pre-generated code from unprotect-reprotect.
 	AlignCodePage();
-	EndWrite();
 }
 
 }  // namespace MIPSComp

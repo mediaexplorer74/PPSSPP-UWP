@@ -31,8 +31,6 @@ extern const char *PPSSPP_GIT_VERSION;
 
 extern bool jitForcedOff;
 
-static bool isMemoryWriting = false;
-
 enum ChatPositions {
 	BOTTOM_LEFT = 0,
 	BOTTOM_CENTER = 1,
@@ -204,8 +202,9 @@ public:
 	float fUITint;
 	float fUISaturation;
 
+	bool bLegacyHandlerReady = false;
 	bool bVertexCache;
-	bool bExecuteWriteResolver;
+	bool bExecuteWriteResolver = false;
 	bool bFastLoop;
 	bool bTextureBackoffCache;
 	bool bVertexDecoderJit;

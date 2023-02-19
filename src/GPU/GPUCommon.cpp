@@ -1151,7 +1151,7 @@ bool GPUCommon::InterpretList(DisplayList &list) {
 	debugRecording_ = GPUDebug::IsActive() || GPURecord::IsActive();
 	const bool useFastRunLoop = (!dumpThisFrame_ && !debugRecording_);
 	while (gpuState == GPUSTATE_RUNNING) {
-		if (!isMemoryWriting) {
+		{
 		{
 			if (list.pc == list.stall) {
 				gpuState = GPUSTATE_STALL;
@@ -1214,7 +1214,7 @@ void GPUCommon::FastRunLoop(DisplayList &list) {
 	const CommandInfo *cmdInfo = cmdInfo_;
 	int dc = downcount;
 	for (; dc > 0; --dc) {
-		if (!isMemoryWriting) {
+		{
 			// We know that display list PCs have the upper nibble == 0 - no need to mask the pointer
 			const u32 op = *(const u32_le*)(Memory::base + list.pc);
 			const u32 cmd = op >> 24;
@@ -1275,7 +1275,7 @@ void GPUCommon::SlowRunLoop(DisplayList &list)
 	const bool dumpThisFrame = dumpThisFrame_;
 	while (downcount > 0)
 	{
-		if (!isMemoryWriting) {
+		{
 			bool process = GPUDebug::NotifyCommand(list.pc);
 			if (process) {
 				GPURecord::NotifyCommand(list.pc);

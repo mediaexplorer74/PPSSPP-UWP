@@ -1275,7 +1275,6 @@ void VertexDecoder::SetVertexType(u32 fmt, const VertexDecoderOptions &options, 
 	// Attempt to JIT as well. But only do that if the main CPU JIT is enabled, in order to aid
 	// debugging attempts - if the main JIT doesn't work, this one won't do any better, probably.
 	if (jitCache && g_Config.bVertexDecoderJit && g_Config.iCpuCore == (int)CPUCore::JIT) {
-		MemoryAccess macc(jitCache->GetCodePtr(), 4096);
 		jitted_ = jitCache->Compile(*this, &jittedSize_);
 		if (!jitted_) {
 			WARN_LOG(G3D, "Vertex decoder JIT failed! fmt = %08x (%s)", fmt_, GetString(SHADER_STRING_SHORT_DESC).c_str());
@@ -1385,7 +1384,6 @@ VertexDecoderJitCache::VertexDecoderJitCache()
 {
 	// 256k should be enough.
 	AllocCodeSpace(1024 * 64 * 4);
-	MemoryAccess macc(region, region_size);
 
 	// Add some random code to "help" MSVC's buggy disassembler :(
 #if defined(_WIN32) && (PPSSPP_ARCH(X86) || PPSSPP_ARCH(AMD64))
@@ -1402,7 +1400,6 @@ VertexDecoderJitCache::VertexDecoderJitCache()
 
 void VertexDecoderJitCache::Clear() {
 	if (g_Config.iCpuCore == (int)CPUCore::JIT) {
-		MemoryAccess macc(region, region_size);
 		ClearCodeSpace(0);
 	}
 }

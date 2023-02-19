@@ -427,10 +427,12 @@ void GameSettingsScreen::CreateViews() {
 		return UI::EVENT_CONTINUE;
 	});
 
-	graphicsSettings->Add(new ItemHeader(gr->T("Advanced Memory")));
-	CheckBox* executeWriteResolver = graphicsSettings->Add(new CheckBox(&g_Config.bExecuteWriteResolver, gr->T("Execute & Write resolver")));
+	graphicsSettings->Add(new ItemHeader(gr->T("Tweaks")));
+	/*CheckBox* executeWriteResolver = graphicsSettings->Add(new CheckBox(&g_Config.bExecuteWriteResolver, gr->T("Execute & Write resolver")));
 	executeWriteResolver->SetDisabledPtr(&g_Config.bSoftwareRendering);
 	executeWriteResolver->SetEnabled(!PSP_IsInited());
+
+	CheckBox* legacyHandler = graphicsSettings->Add(new CheckBox(&g_Config.bLegacyHandlerReady, gr->T("Legacy memory allocation")));*/
 	CheckBox* fastLoopRender = graphicsSettings->Add(new CheckBox(&g_Config.bFastLoop, gr->T("Fast loop render")));
 
 	graphicsSettings->Add(new ItemHeader(gr->T("Performance")));

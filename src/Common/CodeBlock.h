@@ -78,75 +78,11 @@ public:
 		if (!region) {
 			return;
 		}
-
-		if (g_Config.bExecuteWriteResolver && !g_Config.bSoftwareRendering) {
-			MemoryAccess macc(region, region_size);
-			PoisonMemory(offset);
-			ResetCodePtr(offset);
-		}
-		else {
-			if (PlatformIsWXExclusive()) {
-				ProtectMemoryPages(region, region_size, MEM_PROT_READ | MEM_PROT_WRITE);
-			}
-			// If not WX Exclusive, no need to call ProtectMemoryPages because we never change the protection from RWX.
-			PoisonMemory(offset);
-			ResetCodePtr(offset);
-			if (PlatformIsWXExclusive() && offset != 0) {
-				// Need to re-protect the part we didn't clear.
-				ProtectMemoryPages(region, offset, MEM_PROT_READ | MEM_PROT_EXEC);
-			}
-		}
+		PoisonMemory(offset);
+		ResetCodePtr(offset);
 	}
 
-	// BeginWrite/EndWrite assume that we keep appending.
-	// If you don't specify a size and we later encounter an executable non-writable block, we're screwed.
-	// These CANNOT be nested. We rely on the memory protection starting at READ|WRITE after start and reset.
-	void BeginWrite(size_t sizeEstimate = 1) {
-		if (!g_Config.bExecuteWriteResolver || g_Config.bSoftwareRendering) {
-			_dbg_assert_msg_(!writeStart_, "Can't nest BeginWrite calls");
-
-			// In case the last block made the current page exec/no-write, let's fix that.
-			if (PlatformIsWXExclusive()) {
-				writeStart_ = GetCodePtr();
-				if (writeStart_ + sizeEstimate - region > (ptrdiff_t)region_size)
-					sizeEstimate = region_size - (writeStart_ - region);
-				writeEstimated_ = sizeEstimate;
-				ProtectMemoryPages(writeStart_, sizeEstimate, MEM_PROT_READ | MEM_PROT_WRITE);
-			}
-		}
-	}
-
-	// In case you now know your original estimate is wrong.
-	void ContinueWrite(size_t sizeEstimate = 1) {
-		if (!g_Config.bExecuteWriteResolver || g_Config.bSoftwareRendering) {
-			_dbg_assert_msg_(writeStart_, "Must have already called BeginWrite()");
-			if (PlatformIsWXExclusive()) {
-				const uint8_t* pos = GetCodePtr();
-				if (pos + sizeEstimate - region > (ptrdiff_t)region_size)
-					sizeEstimate = region_size - (pos - region);
-				writeEstimated_ = pos - writeStart_ + sizeEstimate;
-				ProtectMemoryPages(pos, sizeEstimate, MEM_PROT_READ | MEM_PROT_WRITE);
-			}
-		}
-	}
-
-	void EndWrite() {
-		if (!g_Config.bExecuteWriteResolver || g_Config.bSoftwareRendering) {
-			// OK, we're done. Re-protect the memory we touched.
-			if (PlatformIsWXExclusive() && writeStart_ != nullptr) {
-				const uint8_t* end = GetCodePtr();
-				size_t sz = end - writeStart_;
-				if (sz > writeEstimated_)
-					WARN_LOG(JIT, "EndWrite(): Estimated %d bytes, wrote %d", (int)writeEstimated_, (int)sz);
-				// If we protected and wrote less, we may need to unprotect.
-				// Especially if we're linking blocks or similar.
-				if (sz < writeEstimated_)
-					sz = writeEstimated_;
-				ProtectMemoryPages(writeStart_, sz, MEM_PROT_READ | MEM_PROT_EXEC);
-				writeStart_ = nullptr;
-			}
-		}
-	}
+	
 
 	// Call this when shutting down. Don't rely on the destructor, even though it'll do the job.
 	void FreeCodeSpace() {

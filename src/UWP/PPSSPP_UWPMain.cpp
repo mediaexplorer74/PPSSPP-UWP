@@ -40,6 +40,7 @@
 #if !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
 #include "UWPHelpers/StorageManager.h"
 #include "UWPHelpers/StorageAsync.h"
+#include <Win32UWPMemory.h>
 #endif
 #if !defined(NO_UI_HELPER) && !defined(__LIBRETRO__)
 #include "UWPHelpers/UIHelpers.h"
@@ -59,20 +60,44 @@ using namespace Windows::UI::Popups;
 using namespace Windows::UI::Core;
 
 // UGLY!
-PPSSPP_UWPMain *g_main;
-extern WindowsAudioBackend *winAudioBackend;
+PPSSPP_UWPMain* g_main;
+extern WindowsAudioBackend* winAudioBackend;
 std::string langRegion;
 bool mainMenuVisible = false;
- 
+
 // TODO: Use Microsoft::WRL::ComPtr<> for D3D11 objects?
 // TODO: See https://github.com/Microsoft/Windows-universal-samples/tree/master/Samples/WindowsAudioSession for WASAPI with UWP
 // TODO: Low latency input: https://github.com/Microsoft/Windows-universal-samples/tree/master/Samples/LowLatencyInput/cpp
 
+
+extern LPVOID(WINAPI* VirtualAllocPtr)(LPVOID, SIZE_T, DWORD, DWORD);
+extern BOOL(WINAPI* VirtualProtectPtr)(LPVOID, SIZE_T, ULONG, PULONG);
+extern HANDLE(WINAPI* CreateFileMappingWPtr)(HANDLE, LPSECURITY_ATTRIBUTES, DWORD, DWORD, DWORD, LPCWSTR);
+extern LPVOID(WINAPI* MapViewOfFileExPtr)(HANDLE, DWORD, DWORD, DWORD, SIZE_T, LPVOID);
+extern BOOL(WINAPI* UnmapViewOfFilePtr)(LPCVOID);
+
 // Loads and initializes application assets when the application is loaded.
-PPSSPP_UWPMain::PPSSPP_UWPMain(App ^app, const std::shared_ptr<DX::DeviceResources>& deviceResources) :
+PPSSPP_UWPMain::PPSSPP_UWPMain(App^ app, const std::shared_ptr<DX::DeviceResources>& deviceResources) :
 	app_(app),
 	m_deviceResources(deviceResources)
 {
+	// Try to import legacy handler
+	if (VirtualAllocPtr == NULL) {
+		VirtualAllocPtr = (LPVOID(WINAPI*)(LPVOID, SIZE_T, DWORD, DWORD))(LPVOID)GetFromKernel(L"VirtualAlloc");
+	}
+	if (VirtualProtectPtr == NULL) {
+		VirtualProtectPtr = (BOOL(WINAPI*)(LPVOID, SIZE_T, ULONG, PULONG))(LPVOID)GetFromKernel(L"VirtualProtect");
+	}
+	if (CreateFileMappingWPtr == NULL) {
+		CreateFileMappingWPtr = (HANDLE(WINAPI*)(HANDLE, LPSECURITY_ATTRIBUTES, DWORD, DWORD, DWORD, LPCWSTR))(LPVOID)GetFromKernel(L"CreateFileMappingW");
+	}
+	if (MapViewOfFileExPtr == NULL) {
+		MapViewOfFileExPtr = (LPVOID(WINAPI*)(HANDLE, DWORD, DWORD, DWORD, SIZE_T, LPVOID))(LPVOID)GetFromKernel(L"MapViewOfFileEx");
+	}
+	if (UnmapViewOfFilePtr == NULL) {
+		UnmapViewOfFilePtr = (BOOL(WINAPI*)(LPCVOID))(LPVOID)GetFromKernel(L"UnmapViewOfFile");
+	}
+
 	g_main = this;
 
 	net::Init();
@@ -92,7 +117,7 @@ PPSSPP_UWPMain::PPSSPP_UWPMain(App ^app, const std::shared_ptr<DX::DeviceResourc
 
 	ctx_.reset(new UWPGraphicsContext(deviceResources));
 
-	const Path &exePath = File::GetExeDirectory();
+	const Path& exePath = File::GetExeDirectory();
 	VFSRegister("", new DirectoryAssetReader(exePath / "Content"));
 	VFSRegister("", new DirectoryAssetReader(exePath));
 
@@ -104,7 +129,8 @@ PPSSPP_UWPMain::PPSSPP_UWPMain(App ^app, const std::shared_ptr<DX::DeviceResourc
 			if (langRegion[i] == '-')
 				langRegion[i] = '_';
 		}
-	} else {
+	}
+	else {
 		langRegion = "en_US";
 	}
 
@@ -130,20 +156,20 @@ PPSSPP_UWPMain::PPSSPP_UWPMain(App ^app, const std::shared_ptr<DX::DeviceResourc
 		LogManager::GetInstance()->SetAllLogLevels(LogTypes::LDEBUG);
 	}
 
-	const char *argv[2] = { "fake", nullptr };
+	const char* argv[2] = { "fake", nullptr };
 
 
 	std::string cacheFolder = ConvertWStringToUTF8(ApplicationData::Current->TemporaryFolder->Path->Data());
 
 	NativeInit(1, argv, "", "", cacheFolder.c_str());
 
-    // Set log file location
+	// Set log file location
 	if (g_Config.bEnableLogging) {
 		//Do cleanup first
 		CleanupLogs();
 		LogManager::GetInstance()->ChangeFileLog(GetLogFile().c_str());
 	}
- 
+
 	NativeInitGraphics(ctx_.get());
 	NativeResized();
 
@@ -190,7 +216,7 @@ bool PPSSPP_UWPMain::Render() {
 
 	// This is not perfect but it will do the job
 	BootToLaunchFile();
- 
+
 	static bool hasSetThreadName = false;
 	if (!hasSetThreadName) {
 		SetCurrentThreadName("UWPRenderThread");
@@ -282,7 +308,8 @@ void PPSSPP_UWPMain::OnMouseWheel(float delta) {
 	int key = NKCODE_EXT_MOUSEWHEEL_UP;
 	if (delta < 0) {
 		key = NKCODE_EXT_MOUSEWHEEL_DOWN;
-	} else if (delta == 0) {
+	}
+	else if (delta == 0) {
 		return;
 	}
 
@@ -395,7 +422,7 @@ std::vector<std::string> System_GetPropertyStringVec(SystemProperty prop) {
 		tempPath.resize(sz);
 		result.push_back(ConvertWStringToUTF8(tempPath));
 
-        //As per my information 'getenv' isn't supported
+		//As per my information 'getenv' isn't supported
 		//https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/getenv-wgetenv?view=msvc-170
 		//if (getenv("TMPDIR") && strlen(getenv("TMPDIR")) != 0)			
 		//  result.push_back(getenv("TMPDIR"));
@@ -403,7 +430,7 @@ std::vector<std::string> System_GetPropertyStringVec(SystemProperty prop) {
 		//	result.push_back(getenv("TMP"));
 		//if (getenv("TEMP") && strlen(getenv("TEMP")) != 0)
 		//	result.push_back(getenv("TEMP"));
- 
+
 		return result;
 	}
 
@@ -421,9 +448,11 @@ int System_GetPropertyInt(SystemProperty prop) {
 		auto ver = Windows::System::Profile::AnalyticsInfo::VersionInfo;
 		if (ver->DeviceFamily == "Windows.Mobile") {
 			return DEVICE_TYPE_MOBILE;
-		} else if (ver->DeviceFamily == "Windows.Xbox") {
+		}
+		else if (ver->DeviceFamily == "Windows.Xbox") {
 			return DEVICE_TYPE_TV;
-		} else {
+		}
+		else {
 			return DEVICE_TYPE_DESKTOP;
 		}
 	}
@@ -446,14 +475,14 @@ float System_GetPropertyFloat(SystemProperty prop) {
 	}
 }
 
-void System_Toast(const char *str) {}
+void System_Toast(const char* str) {}
 
 bool System_GetPropertyBool(SystemProperty prop) {
 	switch (prop) {
 	case SYSPROP_HAS_FILE_BROWSER:
 		return true;
 	case SYSPROP_HAS_FOLDER_BROWSER:
-		return true; 
+		return true;
 	case SYSPROP_HAS_IMAGE_BROWSER:
 		return true;
 	case SYSPROP_HAS_BACK_BUTTON:
@@ -486,7 +515,7 @@ void PPSSPP_UWPMain::BootToLaunchFile() {
 		}
 	}
 }
-void System_SendMessage(const char *command, const char *parameter) {
+void System_SendMessage(const char* command, const char* parameter) {
 	using namespace concurrency;
 	//In very rare cases, choose file/folder dialog (XBOX, WP) may crash
 	//If user try again directly it will cause ppsspp to crash too
@@ -522,14 +551,14 @@ void System_SendMessage(const char *command, const char *parameter) {
 		else if (!strcmp(command, "browse_file")) {
 #if !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
 			//Supported types list
-			std::vector<std::string> supportedExtensions = { ".cso", ".bin", ".iso", ".elf", ".zip"};
+			std::vector<std::string> supportedExtensions = { ".cso", ".bin", ".iso", ".elf", ".zip" };
 
 			//Call file picker
 			ChooseFile(supportedExtensions).then([](std::string filePath) {
 				if (filePath.size() > 1) {
 					NativeMessageReceived("boot", filePath.c_str());
 				}
-			});
+				});
 #else
 			auto picker = ref new Windows::Storage::Pickers::FileOpenPicker();
 			picker->ViewMode = Pickers::PickerViewMode::List;
@@ -550,27 +579,30 @@ void System_SendMessage(const char *command, const char *parameter) {
 				}
 				});
 #endif
-		}else if (!strcmp(command, "browse_folder")) {
+		}
+		else if (!strcmp(command, "browse_folder")) {
 #if !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
 			ChooseFolder().then([](std::string folderPath) {
 				if (folderPath.size() > 1) {
 					NativeMessageReceived("browse_folderSelect", folderPath.c_str());
 				}
-			});
+				});
 #else
 			// Nothing
 #endif
-			}
+		}
 		else if (!strcmp(command, "event")) {
 			if (!strcmp(parameter, "mainscreen")) {
 				mainMenuVisible = true;
 			}
-		}else if (!strcmp(command, "setclipboardtext")) {
+		}
+		else if (!strcmp(command, "setclipboardtext")) {
 			DataPackage^ dataPackage;
 			dataPackage->RequestedOperation = DataPackageOperation::Copy;
 			dataPackage->SetText(convert(std::string(parameter)));
 			Clipboard::SetContent(dataPackage);
-		}else if (!strcmp(command, "bgImage_browse")) {
+		}
+		else if (!strcmp(command, "bgImage_browse")) {
 #if !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
 			//Supported types list
 			std::vector<std::string> supportedExtensions = { ".jpg", ".png" };
@@ -582,11 +614,13 @@ void System_SendMessage(const char *command, const char *parameter) {
 				}
 				});
 #endif
-		}else if (!strcmp(command, "toast")) {
+		}
+		else if (!strcmp(command, "toast")) {
 #if !defined(NO_UI_HELPER) && !defined(__LIBRETRO__)
 			ShowToastNotification("PPSSPP", parameter);
 #endif
-		}else if (!strcmp(command, "toggle_fullscreen")) {
+		}
+		else if (!strcmp(command, "toggle_fullscreen")) {
 			auto view = Windows::UI::ViewManagement::ApplicationView::GetForCurrentView();
 			bool flag = !view->IsFullScreenMode;
 			if (strcmp(parameter, "0") == 0) {
@@ -608,15 +642,15 @@ void System_SendMessage(const char *command, const char *parameter) {
 	}
 }
 
-void OpenDirectory(const char *path) {
-    // This is not supported on XBOX but any other cases it will work
+void OpenDirectory(const char* path) {
+	// This is not supported on XBOX but any other cases it will work
 	//Function below will handle the exception so no problem for XBOX
 #if !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
 	OpenFolder(std::string(path));
 #endif
 }
 
-void LaunchBrowser(const char *url) {
+void LaunchBrowser(const char* url) {
 #if !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
 	OpenFile(std::string(url));
 #else
@@ -637,12 +671,12 @@ void Vibrate(int length_ms) {
 	auto timeSpan = Windows::Foundation::TimeSpan();
 	timeSpan.Duration = length_ms * 10000;
 	// TODO: Can't use this?
-    try {
+	try {
 		Windows::Phone::Devices::Notification::VibrationDevice::GetDefault()->Vibrate(timeSpan);
 	}
 	catch (...) {
 
-	}	
+	}
 #endif
 }
 
@@ -654,9 +688,9 @@ PermissionStatus System_GetPermissionStatus(SystemPermission permission) {
 	return PERMISSION_STATUS_GRANTED;
 }
 
-void System_InputBoxGetString(const std::string &title, const std::string &defaultValue, std::function<void(bool, const std::string &)> cb) {
+void System_InputBoxGetString(const std::string& title, const std::string& defaultValue, std::function<void(bool, const std::string&)> cb) {
 	// TODO
-    // I guess it's not possible to solve it with UWP tools
+	// I guess it's not possible to solve it with UWP tools
 	// The only way to display input dialog is ContentDialog
 	// and it requires XAML enviroment, it will crash by default...
 	cb(false, "");
@@ -671,18 +705,18 @@ std::string GetCPUBrandString() {
 
 	// Enumerate all CPU DeviceInterfaces, and get DeviceInstanceID of the first one.
 	auto if_task = create_task(
-		DeviceInformation::FindAllAsync(if_filter)).then([&](DeviceInformationCollection ^ collection) {
+		DeviceInformation::FindAllAsync(if_filter)).then([&](DeviceInformationCollection^ collection) {
 			if (collection->Size > 0) {
 				auto cpu = collection->GetAt(0);
 				auto id = cpu->Properties->Lookup(L"System.Devices.DeviceInstanceID");
 				cpu_id = dynamic_cast<Platform::String^>(id);
 			}
-	});
+			});
 
 	try {
 		if_task.wait();
 	}
-	catch (const std::exception & e) {
+	catch (const std::exception& e) {
 		const char* what = e.what();
 		INFO_LOG(SYSTEM, "%s", what);
 	}
@@ -695,16 +729,16 @@ std::string GetCPUBrandString() {
 
 		auto dev_task = create_task(
 			DeviceInformation::FindAllAsync(dev_filter, {}, DeviceInformationKind::Device)).then(
-				[&](DeviceInformationCollection ^ collection) {
+				[&](DeviceInformationCollection^ collection) {
 					if (collection->Size > 0) {
 						cpu_name = collection->GetAt(0)->Name;
 					}
-		});
+				});
 
 		try {
 			dev_task.wait();
 		}
-		catch (const std::exception & e) {
+		catch (const std::exception& e) {
 			const char* what = e.what();
 			INFO_LOG(SYSTEM, "%s", what);
 		}
@@ -712,7 +746,8 @@ std::string GetCPUBrandString() {
 
 	if (cpu_name != nullptr) {
 		return FromPlatformString(cpu_name);
-	} else {
+	}
+	else {
 		return "Unknown";
 	}
 }
@@ -720,16 +755,16 @@ std::string GetCPUBrandString() {
 // Emulation of TlsAlloc for Windows 10. Used by glslang. Doesn't actually seem to work, other than fixing the linking errors?
 
 extern "C" {
-DWORD WINAPI __imp_TlsAlloc() {
-	return FlsAlloc(nullptr);
-}
-BOOL WINAPI __imp_TlsFree(DWORD index) {
-	return FlsFree(index);
-}
-BOOL WINAPI __imp_TlsSetValue(DWORD dwTlsIndex, LPVOID lpTlsValue) {
-	return FlsSetValue(dwTlsIndex, lpTlsValue);
-}
-LPVOID WINAPI __imp_TlsGetValue(DWORD dwTlsIndex) {
-	return FlsGetValue(dwTlsIndex);
-}
+	DWORD WINAPI __imp_TlsAlloc() {
+		return FlsAlloc(nullptr);
+	}
+	BOOL WINAPI __imp_TlsFree(DWORD index) {
+		return FlsFree(index);
+	}
+	BOOL WINAPI __imp_TlsSetValue(DWORD dwTlsIndex, LPVOID lpTlsValue) {
+		return FlsSetValue(dwTlsIndex, lpTlsValue);
+	}
+	LPVOID WINAPI __imp_TlsGetValue(DWORD dwTlsIndex) {
+		return FlsGetValue(dwTlsIndex);
+	}
 }
