@@ -4,11 +4,10 @@ PSP emulator with full UWP (ARM) support
 Legacy support with min build 15035
 
 
-## What is this?
+## UWP Support
+Supported by **[UWP2Win32](https://github.com/basharast/UWP2Win32)**
 
-This is the first test on my idea to create UWP storage manager
-
-check out **[UWP2Win32](https://github.com/basharast/UWP2Win32)**
+There is only one release for x64 if you want to test [Click here](https://github.com/basharast/PPSSPP-UWP-ARM/releases/tag/1.14.4)
 
 
 ## What's new?
