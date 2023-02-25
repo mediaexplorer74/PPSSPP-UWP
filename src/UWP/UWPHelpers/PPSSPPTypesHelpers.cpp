@@ -74,7 +74,7 @@ void UpdateFileInfoByItemInfo(ItemInfoUWP item, File::FileInfo* info) {
 bool GetFileInfoUWP(std::string path, File::FileInfo* info) {
 	bool state = false;
 	auto itemInfo = GetItemInfoUWP(path);
-	if (itemInfo.size > -1) {
+	if (itemInfo.size != INVALID_FILE_ATTRIBUTES) {
 		UpdateFileInfoByItemInfo(itemInfo, info);
 		state = true;
 	}

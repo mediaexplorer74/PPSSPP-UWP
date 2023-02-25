@@ -234,6 +234,7 @@ public:
 				information->LastAccessTime.QuadPart = props->DateModified.UniversalTime;
 				information->LastWriteTime.QuadPart = props->DateModified.UniversalTime;
 			}
+			CloseHandle(handle);
 		}
 
 		return information;
@@ -244,6 +245,9 @@ public:
 		return storageFile;
 	}
 
+    time_t  filetime_to_timet(LARGE_INTEGER ull) const {
+		return ull.QuadPart / 10000000ULL - 11644473600ULL;
+	}
 	ItemInfoUWP GetFileInfo() {
 		ItemInfoUWP info;
 		info.name = GetName();
@@ -253,10 +257,10 @@ public:
 		auto sProperties = GetProperties();
 
 		info.size = (uint64_t)GetSize();
-		info.lastAccessTime = (uint64_t)sProperties->LastAccessTime.QuadPart;
-		info.lastWriteTime = (uint64_t)sProperties->LastWriteTime.QuadPart;
-		info.changeTime = (uint64_t)sProperties->ChangeTime.QuadPart;
-		info.creationTime = (uint64_t)sProperties->CreationTime.QuadPart;
+		info.lastAccessTime = (uint64_t)filetime_to_timet(sProperties->LastAccessTime);
+		info.lastWriteTime = (uint64_t)filetime_to_timet(sProperties->LastWriteTime);
+		info.changeTime = (uint64_t)filetime_to_timet(sProperties->ChangeTime);
+		info.creationTime = (uint64_t)filetime_to_timet(sProperties->CreationTime);
 
 
 		info.attributes = sProperties->FileAttributes;

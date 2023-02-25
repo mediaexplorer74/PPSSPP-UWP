@@ -492,6 +492,7 @@ ItemInfoUWP GetItemInfoUWP(std::string path) {
 	}
 	else {
 		info.size = -1;
+		info.attributes = INVALID_FILE_ATTRIBUTES;
 		ERROR_LOG(FILESYS, "Couldn't find or access (%s)", path.c_str());
 	}
 	
