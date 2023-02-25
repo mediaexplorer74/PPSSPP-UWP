@@ -887,7 +887,10 @@ static ConfigSetting graphicsSettings[] = {
 	ReportedConfigSetting("FastLoop", &g_Config.bFastLoop, false, true, true),
 #else
 	//ReportedConfigSetting("ExecuteWriteResolver", &g_Config.bExecuteWriteResolver, false, true, true),
-	//ReportedConfigSetting("LegacyHandle", &g_Config.bLegacyHandlerReady, true, true, true),
+	ReportedConfigSetting("SensorsMove", &g_Config.bSensorsMove, true, true, true),
+	ReportedConfigSetting("bSensorsMoveX", &g_Config.bSensorsMoveX, true, true, true),
+	ReportedConfigSetting("bSensorsMoveY", &g_Config.bSensorsMoveY, false, true, true),
+	ReportedConfigSetting("bSensorsMoveZ", &g_Config.bSensorsMoveZ, false, true, true),
 	ReportedConfigSetting("FastLoop", &g_Config.bFastLoop, true, true, true),
 #endif
 	ReportedConfigSetting("TextureBackoffCache", &g_Config.bTextureBackoffCache, true, true, true),
@@ -1015,7 +1018,7 @@ static ConfigSetting controlSettings[] = {
 	ConfigSetting("TiltBaseY", &g_Config.fTiltBaseY, 0.0f, true, true),
 	ConfigSetting("TiltOrientation", &g_Config.iTiltOrientation, 0, true, true),
 	ConfigSetting("InvertTiltX", &g_Config.bInvertTiltX, false, true, true),
-	ConfigSetting("InvertTiltY", &g_Config.bInvertTiltY, true, true, true),
+	ConfigSetting("InvertTiltY", &g_Config.bInvertTiltY, false, true, true),
 	ConfigSetting("TiltSensitivityX", &g_Config.iTiltSensitivityX, 100, true, true),
 	ConfigSetting("TiltSensitivityY", &g_Config.iTiltSensitivityY, 100, true, true),
 	ConfigSetting("DeadzoneRadius", &g_Config.fDeadzoneRadius, 0.2f, true, true),

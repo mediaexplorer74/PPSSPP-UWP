@@ -124,6 +124,9 @@ std::string GetPreviewPath(std::string path) {
 	replace(pathView, GetInstallationFolder(), "Installation folder");
 	return pathView;
 }
+bool isLocalState(std::string path) {
+	return iequals(GetPreviewPath(path), "LocalState");
+}
 #pragma endregion
 
 #pragma region Internal

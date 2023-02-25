@@ -66,6 +66,7 @@ std::string GetVideosFolder(); // Requires 'videosLibrary' capability
 std::string GetDocumentsFolder(); // Requires 'documentsLibrary' capability
 std::string GetMusicFolder(); // Requires 'musicLibrary' capability
 std::string GetPreviewPath(std::string path);
+bool isLocalState(std::string path);
 
 // Management
 HANDLE CreateFileUWP(std::string path, int accessMode = GENERIC_READ, int shareMode = FILE_SHARE_READ, int openMode = OPEN_EXISTING);

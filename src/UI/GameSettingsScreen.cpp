@@ -76,6 +76,7 @@
 
 #if PPSSPP_PLATFORM(UWP) && !defined(NO_STOARGE_MANAGER)
 #include "UWP/UWPHelpers/StorageManager.h"
+#include "UWP/UWPHelpers/UIHelpers.h"
 #endif
 #if defined(_WIN32) && !PPSSPP_PLATFORM(UWP)
 #pragma warning(disable:4091)  // workaround bug in VS2015 headers
@@ -92,6 +93,8 @@
 extern AndroidAudioState *g_audioState;
 
 #endif
+
+extern bool AccelerometerReady;
 
 GameSettingsScreen::GameSettingsScreen(const Path &gamePath, std::string gameID, bool editThenRestore)
 	: UIDialogScreenWithGameBackground(gamePath), gameID_(gameID), editThenRestore_(editThenRestore) {
@@ -428,11 +431,7 @@ void GameSettingsScreen::CreateViews() {
 	});
 
 	graphicsSettings->Add(new ItemHeader(gr->T("Tweaks")));
-	/*CheckBox* executeWriteResolver = graphicsSettings->Add(new CheckBox(&g_Config.bExecuteWriteResolver, gr->T("Execute & Write resolver")));
-	executeWriteResolver->SetDisabledPtr(&g_Config.bSoftwareRendering);
-	executeWriteResolver->SetEnabled(!PSP_IsInited());
-
-	CheckBox* legacyHandler = graphicsSettings->Add(new CheckBox(&g_Config.bLegacyHandlerReady, gr->T("Legacy memory allocation")));*/
+	//CheckBox* legacyHandler = graphicsSettings->Add(new CheckBox(&g_Config.bLegacyHandlerReady, gr->T("Legacy memory allocation")));
 	CheckBox* fastLoopRender = graphicsSettings->Add(new CheckBox(&g_Config.bFastLoop, gr->T("Fast loop render")));
 
 	graphicsSettings->Add(new ItemHeader(gr->T("Performance")));
@@ -648,6 +647,20 @@ void GameSettingsScreen::CreateViews() {
 
 	if (System_GetPropertyInt(SYSPROP_DEVICE_TYPE) == DEVICE_TYPE_MOBILE) {
 		controlsSettings->Add(new CheckBox(&g_Config.bHapticFeedback, co->T("HapticFeedback", "Haptic Feedback (vibration)")));
+
+		controlsSettings->Add(new ItemHeader(ms->T("Sensors")));
+
+		CheckBox* enableSensorsMove = controlsSettings->Add(new CheckBox(&g_Config.bSensorsMove, gr->T("Enable Sensors")));
+		enableSensorsMove->SetEnabledPtr(&AccelerometerReady);
+
+		CheckBox* enableSensorsMoveX = controlsSettings->Add(new CheckBox(&g_Config.bSensorsMoveX, gr->T("Sensors [X] (Left, Right)")));
+		enableSensorsMoveX->SetEnabledPtr(&g_Config.bSensorsMove);
+
+		CheckBox* enableSensorsMoveY = controlsSettings->Add(new CheckBox(&g_Config.bSensorsMoveY, gr->T("Sensors [Y] (Up, Down)")));
+		enableSensorsMoveY->SetEnabledPtr(&g_Config.bSensorsMove);
+
+		/*CheckBox* enableSensorsMoveZ = controlsSettings->Add(new CheckBox(&g_Config.bSensorsMoveZ, gr->T("Sensors [Z] (Depth)")));
+		enableSensorsMoveZ->SetDisabledPtr(&AccXYZ);*/
 
 		static const char *tiltTypes[] = { "None (Disabled)", "Analog Stick", "D-PAD", "PSP Action Buttons", "L/R Trigger Buttons" };
 		controlsSettings->Add(new PopupMultiChoice(&g_Config.iTiltInputType, co->T("Tilt Input Type"), tiltTypes, 0, ARRAY_SIZE(tiltTypes), co->GetName(), screenManager()))->OnClick.Handle(this, &GameSettingsScreen::OnTiltTypeChange);

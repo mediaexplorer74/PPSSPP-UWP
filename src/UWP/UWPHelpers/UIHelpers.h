@@ -26,6 +26,8 @@ void HideInputKeyboard();
 bool IsCapsLockOn();
 bool IsShiftOnHold();
 bool IsCtrlOnHold();
+bool GetAccelerometerState();
+void LinkAccelerometer();
 
 // Notifications
 void ShowToastNotification(std::string title, std::string message);

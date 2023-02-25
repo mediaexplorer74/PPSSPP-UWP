@@ -332,9 +332,11 @@ void App::OnDpiChanged(DisplayInformation^ sender, Object^ args) {
 	m_main->CreateWindowSizeDependentResources();
 }
 
+DisplayOrientations currentOrientation;
 void App::OnOrientationChanged(DisplayInformation^ sender, Object^ args) {
 	m_deviceResources->SetCurrentOrientation(sender->CurrentOrientation);
 	m_main->CreateWindowSizeDependentResources();
+	currentOrientation = sender->CurrentOrientation;
 }
 
 void App::OnDisplayContentsInvalidated(DisplayInformation^ sender, Object^ args) {

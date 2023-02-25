@@ -836,11 +836,10 @@ void NativeInit(int argc, const char *argv[], const char *savegame_dir, const ch
 	DEBUG_LOG(SYSTEM, "ScreenManager!");
 	screenManager = new ScreenManager();
 #if PPSSPP_PLATFORM(UWP) && !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
-	if (g_Config.memStickDirectory.empty() || IsFirstStart()) {
+	if (g_Config.memStickDirectory.empty() || (IsFirstStart() && isLocalState(g_Config.memStickDirectory.ToString()))) {
 #else
 	if (g_Config.memStickDirectory.empty()) {
 #endif
- 
 		INFO_LOG(SYSTEM, "No memstick directory! Asking for one to be configured.");
 		screenManager->switchScreen(new LogoScreen(AfterLogoScreen::MEMSTICK_SCREEN_INITIAL_SETUP));
 	} else if (gotoGameSettings) {

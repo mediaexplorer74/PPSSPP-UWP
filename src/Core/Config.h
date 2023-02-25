@@ -203,6 +203,10 @@ public:
 	float fUISaturation;
 
 	bool bLegacyHandlerReady = false;
+	bool bSensorsMove;
+	bool bSensorsMoveX;
+	bool bSensorsMoveY;
+	bool bSensorsMoveZ;
 	bool bVertexCache;
 	bool bExecuteWriteResolver = false;
 	bool bFastLoop;

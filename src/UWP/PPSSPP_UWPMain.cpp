@@ -58,6 +58,7 @@ using namespace Concurrency;
 using namespace Windows::Foundation::Collections;
 using namespace Windows::UI::Popups;
 using namespace Windows::UI::Core;
+using namespace Windows::Graphics::Display;
 
 // UGLY!
 PPSSPP_UWPMain* g_main;
@@ -75,6 +76,7 @@ extern BOOL(WINAPI* VirtualProtectPtr)(LPVOID, SIZE_T, ULONG, PULONG);
 extern HANDLE(WINAPI* CreateFileMappingWPtr)(HANDLE, LPSECURITY_ATTRIBUTES, DWORD, DWORD, DWORD, LPCWSTR);
 extern LPVOID(WINAPI* MapViewOfFileExPtr)(HANDLE, DWORD, DWORD, DWORD, SIZE_T, LPVOID);
 extern BOOL(WINAPI* UnmapViewOfFilePtr)(LPCVOID);
+extern DisplayOrientations currentOrientation;
 
 // Loads and initializes application assets when the application is loaded.
 PPSSPP_UWPMain::PPSSPP_UWPMain(App^ app, const std::shared_ptr<DX::DeviceResources>& deviceResources) :
@@ -97,6 +99,11 @@ PPSSPP_UWPMain::PPSSPP_UWPMain(App^ app, const std::shared_ptr<DX::DeviceResourc
 	if (UnmapViewOfFilePtr == NULL) {
 		UnmapViewOfFilePtr = (BOOL(WINAPI*)(LPCVOID))(LPVOID)GetFromKernel(L"UnmapViewOfFile");
 	}
+
+	DisplayInformation^ displayInfo = DisplayInformation::GetForCurrentView();
+	currentOrientation = displayInfo->CurrentOrientation;
+
+	LinkAccelerometer();
 
 	g_main = this;
 
