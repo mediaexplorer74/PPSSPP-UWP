@@ -1,1 +1,0 @@
-MainPackage=C:\Users\Stevans Server\Desktop\Dev\__TESTS__\ppsspp\UWP\ARM\UWP Gold\UWP\PPSSPP_UWP_1.14.4.0_ARM_UWP Gold.appx
