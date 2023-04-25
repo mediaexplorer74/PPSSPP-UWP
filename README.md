@@ -7,9 +7,6 @@ Legacy support with min build 14393
 ## UWP Support
 Supported by **[UWP2Win32](https://github.com/basharast/UWP2Win32)**
 
-There is only one release for x64 if you want to test [Click here](https://github.com/basharast/PPSSPP-UWP-ARM/releases/tag/1.14.4)
-
-
 ## What's new?
 
 - You should be able to choose new Memory stick location (anywhere)
