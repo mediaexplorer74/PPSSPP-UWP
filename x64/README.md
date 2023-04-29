@@ -9,7 +9,7 @@ Here you will find the x64 version temporary until an official release will be a
 
 ## 1.14.25
 
-- Minor fixes
+- [Minor fixes](https://github.com/hrydgard/ppsspp/pull/17350/commits/cb5d18cb03c6db300bc06027376412d53e783ee0)
 
 ## 1.14.24
 
