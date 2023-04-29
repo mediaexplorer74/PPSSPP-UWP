@@ -1,6 +1,10 @@
 ## Description
 Here you will find the x64 version temporary until an official release will be adopted in the main repo
 
+## Download
+
+<a href="https://github.com/basharast/PPSSPP-UWP-ARM/raw/main/x64/PPSSPP%201.14.25.zip">Click here to download</a>
+
 # Changes 
 
 ## 1.14.25
