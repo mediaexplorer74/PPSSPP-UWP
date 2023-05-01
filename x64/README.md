@@ -9,7 +9,7 @@ Here you will find the x64 version temporary until an official release will be a
 
 ## 1.15.0
 
-- Synced the recent changes from offical repo
+- Synced the recent changes from official repo
 - More fixes and improvements on the [storage manager](https://github.com/hrydgard/ppsspp/pull/17350/commits/9b0577351fde7ac334bec33ab603cc38b69196dd)
 
 ## 1.14.26
