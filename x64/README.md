@@ -3,9 +3,14 @@ Here you will find the x64 version temporary until an official release will be a
 
 ## Download
 
-<a href="https://github.com/basharast/PPSSPP-UWP-ARM/raw/main/x64/PPSSPP%201.14.26.zip">Click here to download</a>
+<a href="https://github.com/basharast/PPSSPP-UWP-ARM/raw/main/x64/PPSSPP%201.15.0.zip">Click here to download</a>
 
 # Changes 
+
+## 1.15.0
+
+- Synced the recent changes from offical repo
+- More fixes and improvements on the [storage manager](https://github.com/hrydgard/ppsspp/pull/17350/commits/9b0577351fde7ac334bec33ab603cc38b69196dd)
 
 ## 1.14.26
 
