@@ -3,9 +3,13 @@ Here you will find the x64 version temporary until an official release will be a
 
 ## Download
 
-<a href="https://github.com/basharast/PPSSPP-UWP-ARM/raw/main/x64/PPSSPP%201.15.0.zip">Click here to download</a>
+<a href="https://github.com/basharast/PPSSPP-UWP-ARM/raw/main/x64/PPSSPP%201.15.1.zip">Click here to download</a>
 
 # Changes 
+
+## 1.15.1
+
+- Fixed [free space report](https://github.com/hrydgard/ppsspp/pull/17350/commits/808ff28aa5daf81fcd652c4977d3926409569e9d) and other minor issues
 
 ## 1.15.0
 
