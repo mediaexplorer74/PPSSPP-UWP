@@ -29,6 +29,7 @@
 #include "Common/CommonFuncs.h"
 #include "Common/SysError.h"
 #include "Core/Config.h"
+#include "Core/HLE/Plugins.h"
 
 #ifndef HID_USAGE_PAGE_GENERIC
 #define HID_USAGE_PAGE_GENERIC         ((USHORT) 0x01)
@@ -317,24 +318,27 @@ namespace WindowsRawInput {
 		KeyInput key;
 		key.deviceId = DEVICE_ID_MOUSE;
 
-		g_mouseDeltaX += raw->data.mouse.lLastX;
-		g_mouseDeltaY += raw->data.mouse.lLastY;
+		float mx, my;
+		g_inputManager.AccumulateMouseDeltas(raw->data.mouse.lLastX, raw->data.mouse.lLastY, &mx, &my);
 
-		const int rawInputDownID[5] = {
+		HLEPlugins::PluginDataAxis[JOYSTICK_AXIS_MOUSE_REL_X] = mx;
+		HLEPlugins::PluginDataAxis[JOYSTICK_AXIS_MOUSE_REL_Y] = my;
+
+		static const int rawInputDownID[5] = {
 			RI_MOUSE_LEFT_BUTTON_DOWN,
 			RI_MOUSE_RIGHT_BUTTON_DOWN,
 			RI_MOUSE_BUTTON_3_DOWN,
 			RI_MOUSE_BUTTON_4_DOWN,
 			RI_MOUSE_BUTTON_5_DOWN
 		};
-		const int rawInputUpID[5] = {
+		static const int rawInputUpID[5] = {
 			RI_MOUSE_LEFT_BUTTON_UP,
 			RI_MOUSE_RIGHT_BUTTON_UP,
 			RI_MOUSE_BUTTON_3_UP,
 			RI_MOUSE_BUTTON_4_UP,
 			RI_MOUSE_BUTTON_5_UP
 		};
-		const int vkInputID[5] = {
+		static const int vkInputID[5] = {
 			VK_LBUTTON,
 			VK_RBUTTON,
 			VK_MBUTTON,

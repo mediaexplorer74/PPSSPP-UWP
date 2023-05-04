@@ -30,7 +30,7 @@
 
 class DevMenuScreen : public PopupScreen {
 public:
-	DevMenuScreen(const Path &gamePath, std::shared_ptr<I18NCategory> i18n) : PopupScreen(i18n->T("Dev Tools")), gamePath_(gamePath) {}
+	DevMenuScreen(const Path &gamePath, I18NCat cat) : PopupScreen(T(cat, "Dev Tools")), gamePath_(gamePath) {}
 
 	const char *tag() const override { return "DevMenu"; }
 
@@ -45,7 +45,6 @@ protected:
 	UI::EventReturn OnFreezeFrame(UI::EventParams &e);
 	UI::EventReturn OnDumpFrame(UI::EventParams &e);
 	UI::EventReturn OnDeveloperTools(UI::EventParams &e);
-	UI::EventReturn OnToggleAudioDebug(UI::EventParams &e);
 	UI::EventReturn OnResetLimitedLogging(UI::EventParams &e);
 
 private:

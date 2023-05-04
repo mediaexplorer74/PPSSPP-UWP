@@ -7,11 +7,13 @@
 #include "Common/CommonTypes.h"
 #include "Common/Data/Format/RIFF.h"
 #include "Common/Log.h"
+#include "Common/System/System.h"
 #include "Common/Serialize/SerializeFuncs.h"
 #include "Common/TimeUtil.h"
 #include "Common/Data/Collections/FixedSizeQueue.h"
 #include "Core/HW/SimpleAudioDec.h"
 #include "Core/HLE/__sceAudio.h"
+#include "Core/System.h"
 #include "GameInfoCache.h"
 #include "Core/Config.h"
 #include "UI/BackgroundAudio.h"
@@ -257,7 +259,7 @@ BackgroundAudio::~BackgroundAudio() {
 
 BackgroundAudio::Sample *BackgroundAudio::LoadSample(const std::string &path) {
 	size_t bytes;
-	uint8_t *data = VFSReadFile(path.c_str(), &bytes);
+	uint8_t *data = g_VFS.ReadFile(path.c_str(), &bytes);
 	if (!data) {
 		return nullptr;
 	}
@@ -333,14 +335,18 @@ void BackgroundAudio::SetGame(const Path &path) {
 	bgGamePath_ = path;
 }
 
-int BackgroundAudio::Play() {
+bool BackgroundAudio::Play() {
+	if (GetUIState() == UISTATE_INGAME) {
+		return false;
+	}
+
 	std::lock_guard<std::mutex> lock(mutex_);
 
 	// Immediately stop the sound if it is turned off while playing.
 	if (!g_Config.bEnableSound) {
 		Clear(true);
-		__PushExternalAudio(0, 0);
-		return 0;
+		System_AudioClear();
+		return true;
 	}
 
 	double now = time_now_d();
@@ -388,7 +394,7 @@ int BackgroundAudio::Play() {
 		}
 	}
 
-	__PushExternalAudio(buffer, sz);
+	System_AudioPushSamples(buffer, sz);
 
 	if (at3Reader_ && fadingOut_ && volume_ <= 0.0f) {
 		Clear(true);
@@ -398,7 +404,7 @@ int BackgroundAudio::Play() {
 
 	lastPlaybackTime_ = now;
 
-	return 0;
+	return true;
 }
 
 void BackgroundAudio::Update() {

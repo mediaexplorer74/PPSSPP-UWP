@@ -203,6 +203,9 @@ bool ScrollView::Touch(const TouchInput &input) {
 
 ScrollView::Bob ScrollView::ComputeBob() const {
 	Bob bob{};
+	if (views_.empty()) {
+		return bob;
+	}
 	float childHeight = std::max(0.01f, views_[0]->GetBounds().h);
 	float scrollMax = std::max(0.0f, childHeight - bounds_.h);
 	float ratio = bounds_.h / childHeight;
@@ -517,7 +520,7 @@ void ListView::Measure(const UIContext &dc, MeasureSpec horiz, MeasureSpec vert)
 }
 
 std::string ListView::DescribeText() const {
-	auto u = GetI18NCategory("UI Elements");
+	auto u = GetI18NCategory(I18NCat::UI_ELEMENTS);
 	return DescribeListOrdered(u->T("List:"));
 }
 
@@ -552,4 +555,4 @@ bool StringVectorListAdaptor::AddEventCallback(View *view, std::function<EventRe
 	return EVENT_DONE;
 }
 
-}
+}  // namespace

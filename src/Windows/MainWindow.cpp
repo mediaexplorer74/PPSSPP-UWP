@@ -18,12 +18,12 @@
 // TODO: Get rid of the internal window.
 // Tried before but Intel drivers screw up when minimizing, or something ?
 
-// NOTE: Apologies for the quality of this code, this is really from pre-opensource Dolphin - that is, 2003.
-// It's improving slowly, though. :)
 #include "stdafx.h"
+
+#include "ppsspp_config.h"
+
 #include "Common/CommonWindows.h"
 #include "Common/OSVersion.h"
-#include "ppsspp_config.h"
 
 #include <Windowsx.h>
 #include <shellapi.h>
@@ -56,6 +56,8 @@
 #include "Windows/GPU/WindowsGLContext.h"
 #include "Windows/GEDebugger/GEDebugger.h"
 #endif
+#include "Windows/W32Util/DarkMode.h"
+#include "Windows/W32Util/UAHMenuBar.h"
 #include "Windows/Debugger/Debugger_Disasm.h"
 #include "Windows/Debugger/Debugger_MemoryDlg.h"
 
@@ -105,7 +107,6 @@ struct VerySleepy_AddrInfo {
 };
 
 static std::wstring windowTitle;
-extern ScreenManager *screenManager;
 
 #define TIMER_CURSORUPDATE 1
 #define TIMER_CURSORMOVEUPDATE 2
@@ -177,7 +178,7 @@ namespace MainWindow
 
 		WNDCLASSEX wcdisp;
 		memset(&wcdisp, 0, sizeof(wcdisp));
-		// Display Window
+		// Display Window (contained in main window)
 		wcdisp.cbSize = sizeof(WNDCLASSEX);
 		wcdisp.style = CS_HREDRAW | CS_VREDRAW;
 		wcdisp.lpfnWndProc = (WNDPROC)DisplayProc;
@@ -471,7 +472,6 @@ namespace MainWindow
 	}
 
 	void UpdateWindowTitle() {
-		// Seems to be fine to call now since we use a UNICODE build...
 		std::wstring title = windowTitle;
 		if (PPSSPP_ID >= 1 && GetInstancePeerCount() > 1) {
 			title.append(ConvertUTF8ToWString(StringFromFormat(" (instance: %d)", (int)PPSSPP_ID)));
@@ -633,7 +633,7 @@ namespace MainWindow
 			// Then never erase, let the OpenGL drawing take care of everything.
 			return 1;
 
-		// Poor man's touch - mouse input. We send the data  asynchronous touch events for minimal latency.
+		// Mouse input. We send asynchronous touch events for minimal latency.
 		case WM_LBUTTONDOWN:
 			if (!touchHandler.hasTouch() ||
 				(GetMessageExtraInfo() & MOUSEEVENTF_MASK_PLUS_PENTOUCH) != MOUSEEVENTF_FROMTOUCH_NOPEN)
@@ -641,8 +641,8 @@ namespace MainWindow
 				// Hack: Take the opportunity to show the cursor.
 				mouseButtonDown = true;
 
-				float x = GET_X_LPARAM(lParam) * g_dpi_scale_x;
-				float y = GET_Y_LPARAM(lParam) * g_dpi_scale_y;
+				float x = GET_X_LPARAM(lParam) * g_display.dpi_scale_x;
+				float y = GET_Y_LPARAM(lParam) * g_display.dpi_scale_y;
 				WindowsRawInput::SetMousePos(x, y);
 
 				TouchInput touch;
@@ -682,8 +682,8 @@ namespace MainWindow
 				prevCursorX = cursorX;
 				prevCursorY = cursorY;
 
-				float x = (float)cursorX * g_dpi_scale_x;
-				float y = (float)cursorY * g_dpi_scale_y;
+				float x = (float)cursorX * g_display.dpi_scale_x;
+				float y = (float)cursorY * g_display.dpi_scale_y;
 				WindowsRawInput::SetMousePos(x, y);
 
 				if (wParam & MK_LBUTTON) {
@@ -704,8 +704,8 @@ namespace MainWindow
 				// Hack: Take the opportunity to hide the cursor.
 				mouseButtonDown = false;
 
-				float x = (float)GET_X_LPARAM(lParam) * g_dpi_scale_x;
-				float y = (float)GET_Y_LPARAM(lParam) * g_dpi_scale_y;
+				float x = (float)GET_X_LPARAM(lParam) * g_display.dpi_scale_x;
+				float y = (float)GET_Y_LPARAM(lParam) * g_display.dpi_scale_y;
 				WindowsRawInput::SetMousePos(x, y);
 
 				TouchInput touch;
@@ -728,26 +728,85 @@ namespace MainWindow
 		return 0;
 	}
 
+	RECT MapRectFromClientToWndCoords(HWND hwnd, const RECT & r)
+	{
+		RECT wnd_coords = r;
+
+		// map to screen
+		MapWindowPoints(hwnd, NULL, reinterpret_cast<POINT *>(&wnd_coords), 2);
+
+		RECT scr_coords;
+		GetWindowRect(hwnd, &scr_coords);
+
+		// map to window coords by substracting the window coord origin in
+		// screen coords.
+		OffsetRect(&wnd_coords, -scr_coords.left, -scr_coords.top);
+
+		return wnd_coords;
+	}
+
+	RECT GetNonclientMenuBorderRect(HWND hwnd)
+	{
+		RECT r;
+		GetClientRect(hwnd, &r);
+		r = MapRectFromClientToWndCoords(hwnd, r);
+		int y = r.top - 1;
+		return {
+			r.left,
+			y,
+			r.right,
+			y + 1
+		};
+	}
+
 	LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)	{
+		LRESULT darkResult = 0;
+		if (UAHDarkModeWndProc(hWnd, message, wParam, lParam, &darkResult)) {
+			return darkResult;
+		}
+
 		switch (message) {
 		case WM_CREATE:
 			if (!DoesVersionMatchWindows(6, 0, 0, 0, true)) {
 				// Remove the D3D11 choice on versions below XP
 				RemoveMenu(GetMenu(hWnd), ID_OPTIONS_DIRECT3D11, MF_BYCOMMAND);
 			}
+			if (g_darkModeSupported) {
+				SendMessageW(hWnd, WM_THEMECHANGED, 0, 0);
+			}
 			break;
 
 		case WM_USER_GET_BASE_POINTER:
 			Reporting::NotifyDebugger();
 			switch (lParam) {
-			case 0:
-				return (u32)(u64)Memory::base;
-			case 1:
-				return (u32)((u64)Memory::base >> 32);
+			case 0: return (u32)(u64)Memory::base;
+			case 1: return (u32)((u64)Memory::base >> 32);
+			case 2: return (u32)(u64)(&Memory::base);
+			case 3: return (u32)((u64)(&Memory::base) >> 32);
 			default:
 				return 0;
 			}
 			break;
+
+		// Hack to kill the white line underneath the menubar.
+		// From https://stackoverflow.com/questions/57177310/how-to-paint-over-white-line-between-menu-bar-and-client-area-of-window
+		case WM_NCPAINT:
+		case WM_NCACTIVATE:
+		{
+			if (!IsDarkModeEnabled() || IsIconic(hWnd)) {
+				return DefWindowProc(hWnd, message, wParam, lParam);
+			}
+
+			auto result = DefWindowProc(hWnd, message, wParam, lParam);
+			// Paint over the line with pure black. Could also try to figure out the dark theme color.
+			HDC hdc = GetWindowDC(hWnd);
+			RECT r = GetNonclientMenuBorderRect(hWnd);
+			HBRUSH red = CreateSolidBrush(RGB(0, 0, 0));
+			FillRect(hdc, &r, red);
+			DeleteObject(red);
+			ReleaseDC(hWnd, hdc);
+			return result;
+		}
 
 		case WM_GETMINMAXINFO:
 			{
@@ -804,7 +863,7 @@ namespace MainWindow
 
 		case WM_ERASEBKGND:
 			// This window is always covered by DisplayWindow. No reason to erase.
-			return 1;
+			return 0;
 
 		case WM_MOVE:
 			SavePosition();
@@ -1001,14 +1060,6 @@ namespace MainWindow
 			UpdateWindowTitle();
 			break;
 
-		case WM_USER_BROWSE_BOOT_DONE:
-			BrowseAndBootDone();
-			break;
-
-		case WM_USER_BROWSE_BG_DONE:
-			BrowseBackgroundDone();
-			break;
-
 		case WM_USER_RESTART_EMUTHREAD:
 			NativeSetRestarting();
 			InputDevice::StopPolling();
@@ -1048,6 +1099,23 @@ namespace MainWindow
 				}
 				return DefWindowProc(hWnd, message, wParam, lParam);
 			}
+			break;
+		case WM_SETTINGCHANGE:
+			{
+				if (g_darkModeSupported && IsColorSchemeChangeMessage(lParam))
+					SendMessageW(hWnd, WM_THEMECHANGED, 0, 0);
+			}
+			return DefWindowProc(hWnd, message, wParam, lParam);
+
+		case WM_THEMECHANGED:
+		{
+			if (g_darkModeSupported)
+			{
+				_AllowDarkModeForWindow(hWnd, g_darkModeEnabled);
+				RefreshTitleBarThemeColor(hWnd);
+			}
+			return DefWindowProc(hWnd, message, wParam, lParam);
+		}
 
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);

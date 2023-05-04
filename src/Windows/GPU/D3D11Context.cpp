@@ -51,8 +51,8 @@ void D3D11Context::SwapInterval(int interval) {
 HRESULT D3D11Context::CreateTheDevice(IDXGIAdapter *adapter) {
 	bool windowed = true;
 	// D3D11 has no need for display rotation.
-	g_display_rotation = DisplayRotation::ROTATE_0;
-	g_display_rot_matrix.setIdentity();
+	g_display.rotation = DisplayRotation::ROTATE_0;
+	g_display.rot_matrix.setIdentity();
 #if defined(_DEBUG) && !PPSSPP_ARCH(ARM) && !PPSSPP_ARCH(ARM64)
 	UINT createDeviceFlags = D3D11_CREATE_DEVICE_DEBUG;
 #else
@@ -136,7 +136,7 @@ bool D3D11Context::Init(HINSTANCE hInst, HWND wnd, std::string *error_message) {
 
 	if (FAILED(hr)) {
 		const char *defaultError = "Your GPU does not appear to support Direct3D 11.\n\nWould you like to try again using Direct3D 9 instead?";
-		auto err = GetI18NCategory("Error");
+		auto err = GetI18NCategory(I18NCat::ERRORS);
 
 		std::wstring error;
 

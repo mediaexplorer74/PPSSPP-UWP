@@ -68,8 +68,8 @@ private:
 	bool hasVisibleUI();
 	void renderUI();
 
-	void onVKeyDown(int virtualKeyCode);
-	void onVKeyUp(int virtualKeyCode);
+	void onVKey(int virtualKeyCode, bool down);
+	void onVKeyAnalog(int virtualKeyCode, float value);
 
 	void autoLoad();
 	void checkPowerDown();

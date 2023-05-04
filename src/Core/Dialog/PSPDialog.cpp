@@ -39,6 +39,27 @@ PSPDialog::PSPDialog(UtilityDialogType type) : dialogType_(type) {
 PSPDialog::~PSPDialog() {
 }
 
+void PSPDialog::InitCommon() {
+	UpdateCommon();
+
+	if (GetCommonParam() && GetCommonParam()->language != g_Config.iLanguage) {
+		WARN_LOG(SCEUTILITY, "Game requested language %d, ignoring and using user language", GetCommonParam()->language);
+	}
+}
+
+void PSPDialog::UpdateCommon() {
+	okButtonImg = ImageID("I_CIRCLE");
+	cancelButtonImg = ImageID("I_CROSS");
+	okButtonFlag = CTRL_CIRCLE;
+	cancelButtonFlag = CTRL_CROSS;
+	if (GetCommonParam() && GetCommonParam()->buttonSwap == 1) {
+		okButtonImg = ImageID("I_CROSS");
+		cancelButtonImg = ImageID("I_CIRCLE");
+		okButtonFlag = CTRL_CROSS;
+		cancelButtonFlag = CTRL_CIRCLE;
+	}
+}
+
 PSPDialog::DialogStatus PSPDialog::GetStatus() {
 	if (pendingStatusTicks != 0 && CoreTiming::GetTicks() >= pendingStatusTicks) {
 		bool changeAllowed = true;
@@ -290,7 +311,7 @@ void PSPDialog::DisplayButtons(int flags, const char *caption)
 
 	PPGeStyle textStyle = FadedStyle(PPGeAlign::BOX_LEFT, FONT_SCALE);
 
-	auto di = GetI18NCategory("Dialog");
+	auto di = GetI18NCategory(I18NCat::DIALOG);
 	float x1 = 183.5f, x2 = 261.5f;
 	if (GetCommonParam()->buttonSwap == 1) {
 		x1 = 261.5f;

@@ -26,6 +26,9 @@
 #include "Common/Serialize/SerializeSet.h"
 #include "Common/File/FileUtil.h"
 #include "Common/StringUtils.h"
+#include "Common/System/Request.h"
+#include "Common/System/System.h"
+
 #include "Core/Config.h"
 #include "Core/Core.h"
 #include "Core/HLE/HLE.h"
@@ -35,7 +38,6 @@
 #include "Core/HLE/ReplaceTables.h"
 #include "Core/HLE/sceDisplay.h"
 #include "Core/Reporting.h"
-#include "Core/Host.h"
 #include "Core/Loaders.h"
 #include "Core/MIPS/MIPS.h"
 #include "Core/MIPS/MIPSAnalyst.h"
@@ -882,7 +884,7 @@ void PSPModule::Cleanup() {
 	}
 }
 
-static void __SaveDecryptedEbootToStorageMedia(const u8 *decryptedEbootDataPtr, const u32 length) {
+static void SaveDecryptedEbootToStorageMedia(const u8 *decryptedEbootDataPtr, const u32 length, const char *name) {
 	if (!decryptedEbootDataPtr) {
 		ERROR_LOG(SCEMODULE, "Error saving decrypted EBOOT.BIN: invalid pointer");
 		return;
@@ -893,7 +895,7 @@ static void __SaveDecryptedEbootToStorageMedia(const u8 *decryptedEbootDataPtr, 
 		return;
 	}
 
-	const std::string filenameToDumpTo = g_paramSFO.GetDiscID() + ".BIN";
+	const std::string filenameToDumpTo = StringFromFormat("%s_%s.BIN", g_paramSFO.GetDiscID().c_str(), name);
 	const Path dumpDirectory = GetSysDirectory(DIRECTORY_DUMP);
 	const Path fullPath = dumpDirectory / filenameToDumpTo;
 
@@ -1206,6 +1208,10 @@ static PSPModule *__KernelLoadELFFromPtr(const u8 *ptr, size_t elfSize, u32 load
 		ptr = newptr;
 		magicPtr = (u32_le *)ptr;
 		int ret = pspDecryptPRX(in, (u8*)ptr, head->psp_size);
+		if (ret <= 0 && *(u32_le *)&ptr[0x150] == 0x464c457f) {
+			ret = head->psp_size - 0x150;
+			memcpy(newptr, in + 0x150, ret);
+		}
 		if (reportedModule) {
 			// This should happen for all "kernel" modules.
 			*error_string = "Missing key";
@@ -1258,9 +1264,10 @@ static PSPModule *__KernelLoadELFFromPtr(const u8 *ptr, size_t elfSize, u32 load
 
 			// If we've made it this far, it should be safe to dump.
 			if (g_Config.bDumpDecryptedEboot) {
-				INFO_LOG(SCEMODULE, "Dumping decrypted EBOOT.BIN to file.");
-				const u32 dumpLength = ret;
-				__SaveDecryptedEbootToStorageMedia(ptr, dumpLength);
+				// Copy the name to ensure it's null terminated.
+				char name[32]{};
+				strncpy(name, head->modname, ARRAY_SIZE(head->modname));
+				SaveDecryptedEbootToStorageMedia(ptr, (u32)elfSize, name);
 			}
 		}
 	}
@@ -1625,6 +1632,8 @@ static PSPModule *__KernelLoadELFFromPtr(const u8 *ptr, size_t elfSize, u32 load
 		}
 	}
 
+	System_Notify(SystemNotification::SYMBOL_MAP_UPDATED);
+
 	u32 moduleSize = sizeof(module->nm);
 	char tag[32];
 	snprintf(tag, sizeof(tag), "SceModule-%d", module->nm.modid);
@@ -1829,8 +1838,6 @@ bool __KernelLoadExec(const char *filename, u32 paramPtr, std::string *error_str
 		return false;
 	}
 
-	host->NotifySymbolMapUpdated();
-
 	char moduleName[29] = { 0 };
 	int moduleVersion = module->nm.version[0] | (module->nm.version[1] << 8);
 	truncate_cpy(moduleName, module->nm.name);
@@ -1932,7 +1939,7 @@ void __KernelGPUReplay() {
 		PSPPointer<u8> topaddr;
 		u32 linesize = 512;
 		__DisplayGetFramebuf(&topaddr, &linesize, nullptr, 0);
-		host->SendDebugScreenshot(topaddr, linesize, 272);
+		System_SendDebugScreenshot(std::string((const char *)&topaddr[0], linesize * 272), 272);
 		Core_Stop();
 	}
 }
@@ -2606,7 +2613,7 @@ static SceUID sceKernelLoadModuleBufferUsbWlan(u32 size, u32 bufPtr, u32 flags, 
 
 static u32 sceKernelQueryModuleInfo(u32 uid, u32 infoAddr)
 {
-	INFO_LOG(SCEMODULE, "sceKernelQueryModuleInfo(%i, %08x)", uid, infoAddr);
+	DEBUG_LOG(SCEMODULE, "sceKernelQueryModuleInfo(%i, %08x)", uid, infoAddr);
 	u32 error;
 	PSPModule *module = kernelObjects.Get<PSPModule>(uid, error);
 	if (!module)

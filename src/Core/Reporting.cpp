@@ -142,8 +142,7 @@ namespace Reporting
 		}
 
 		if (crcPending) {
-			// Already in process.
-			INFO_LOG(SYSTEM, "CRC already pending");
+			// Already in process. This is OK - on the crash screen we call this in a polling fashion.
 			return;
 		}
 
@@ -481,6 +480,8 @@ namespace Reporting
 	{
 		SetCurrentThreadName("Report");
 
+		AndroidJNIThreadContext jniContext;  // destructor detaches
+
 		Payload &payload = payloadBuffer[pos];
 		Buffer output;
 
@@ -570,7 +571,7 @@ namespace Reporting
 			return false;
 #else
 		File::FileInfo fo;
-		if (!VFSGetFileInfo("flash0/font/jpn0.pgf", &fo))
+		if (!g_VFS.GetFileInfo("flash0/font/jpn0.pgf", &fo))
 			return false;
 #endif
 

@@ -212,7 +212,6 @@ GLuint ShaderStageToOpenGL(ShaderStage stage) {
 class OpenGLShaderModule : public ShaderModule {
 public:
 	OpenGLShaderModule(GLRenderManager *render, ShaderStage stage, const std::string &tag) : render_(render), stage_(stage), tag_(tag) {
-		DEBUG_LOG(G3D, "Shader module created (%p)", this);
 		glstage_ = ShaderStageToOpenGL(stage);
 	}
 
@@ -347,6 +346,11 @@ public:
 		renderManager_.SetErrorCallback(callback, userdata);
 	}
 
+	PresentationMode GetPresentationMode() const override {
+		// TODO: Fix. Not yet used.
+		return PresentationMode::FIFO;
+	}
+
 	DepthStencilState *CreateDepthStencilState(const DepthStencilStateDesc &desc) override;
 	BlendState *CreateBlendState(const BlendStateDesc &desc) override;
 	SamplerState *CreateSamplerState(const SamplerStateDesc &desc) override;
@@ -366,7 +370,7 @@ public:
 
 	void CopyFramebufferImage(Framebuffer *src, int level, int x, int y, int z, Framebuffer *dst, int dstLevel, int dstX, int dstY, int dstZ, int width, int height, int depth, int channelBits, const char *tag) override;
 	bool BlitFramebuffer(Framebuffer *src, int srcX1, int srcY1, int srcX2, int srcY2, Framebuffer *dst, int dstX1, int dstY1, int dstX2, int dstY2, int channelBits, FBBlitFilter filter, const char *tag) override;
-	bool CopyFramebufferToMemorySync(Framebuffer *src, int channelBits, int x, int y, int w, int h, Draw::DataFormat format, void *pixels, int pixelStride, const char *tag) override;
+	bool CopyFramebufferToMemory(Framebuffer *src, int channelBits, int x, int y, int w, int h, Draw::DataFormat format, void *pixels, int pixelStride, ReadbackMode mode, const char *tag) override;
 
 	// These functions should be self explanatory.
 	void BindFramebufferAsRenderTarget(Framebuffer *fbo, const RenderPassInfo &rp, const char *tag) override;
@@ -386,9 +390,9 @@ public:
 		renderManager_.SetScissor({ left, top, width, height });
 	}
 
-	void SetViewports(int count, Viewport *viewports) override {
+	void SetViewport(const Viewport &viewport) override {
 		// Same structure, different name.
-		renderManager_.SetViewport((GLRViewport &)*viewports);
+		renderManager_.SetViewport((GLRViewport &)viewport);
 	}
 
 	void SetBlendFactor(float color[4]) override {
@@ -741,7 +745,9 @@ OpenGLContext::OpenGLContext() {
 			// This too...
 			shaderLanguageDesc_.shaderLanguage = ShaderLanguage::GLSL_1xx;
 			if (gl_extensions.EXT_gpu_shader4) {
-				shaderLanguageDesc_.bitwiseOps = true;
+				// Older macOS devices seem to have problems defining uint uniforms.
+				// Let's just assume OpenGL 3.0+ is required.
+				shaderLanguageDesc_.bitwiseOps = gl_extensions.VersionGEThan(3, 0, 0);
 				shaderLanguageDesc_.texelFetch = "texelFetch2D";
 			}
 		}
@@ -989,7 +995,7 @@ static void LogReadPixelsError(GLenum error) {
 }
 #endif
 
-bool OpenGLContext::CopyFramebufferToMemorySync(Framebuffer *src, int channelBits, int x, int y, int w, int h, Draw::DataFormat dataFormat, void *pixels, int pixelStride, const char *tag) {
+bool OpenGLContext::CopyFramebufferToMemory(Framebuffer *src, int channelBits, int x, int y, int w, int h, Draw::DataFormat dataFormat, void *pixels, int pixelStride, ReadbackMode mode, const char *tag) {
 	if (gl_extensions.IsGLES && (channelBits & FB_COLOR_BIT) == 0) {
 		// Can't readback depth or stencil on GLES.
 		return false;
@@ -1002,8 +1008,7 @@ bool OpenGLContext::CopyFramebufferToMemorySync(Framebuffer *src, int channelBit
 		aspect |= GL_DEPTH_BUFFER_BIT;
 	if (channelBits & FB_STENCIL_BIT)
 		aspect |= GL_STENCIL_BUFFER_BIT;
-	renderManager_.CopyFramebufferToMemorySync(fb ? fb->framebuffer_ : nullptr, aspect, x, y, w, h, dataFormat, (uint8_t *)pixels, pixelStride, tag);
-	return true;
+	return renderManager_.CopyFramebufferToMemory(fb ? fb->framebuffer_ : nullptr, aspect, x, y, w, h, dataFormat, (uint8_t *)pixels, pixelStride, mode, tag);
 }
 
 
@@ -1264,7 +1269,7 @@ bool OpenGLPipeline::LinkShaders(const PipelineDesc &desc) {
 		for (int i = 0; i < (int)std::min((const uint32_t)samplers_.size(), MAX_TEXTURE_SLOTS); i++) {
 			queries.push_back({ &locs_->samplerLocs_[i], samplers_[i].name, true });
 		}
-		samplersToCheck = (int)samplers_.size();
+		samplersToCheck = (int)std::min((const uint32_t)samplers_.size(), MAX_TEXTURE_SLOTS);
 	} else {
 		queries.push_back({ &locs_->samplerLocs_[0], "sampler0" });
 		queries.push_back({ &locs_->samplerLocs_[1], "sampler1" });
@@ -1558,7 +1563,23 @@ uint32_t OpenGLContext::GetDataFormatSupport(DataFormat fmt) const {
 	case DataFormat::BC1_RGBA_UNORM_BLOCK:
 	case DataFormat::BC2_UNORM_BLOCK:
 	case DataFormat::BC3_UNORM_BLOCK:
-		return FMT_TEXTURE;
+		return gl_extensions.supportsBC123 ? FMT_TEXTURE : 0;
+
+	case DataFormat::BC4_UNORM_BLOCK:
+	case DataFormat::BC5_UNORM_BLOCK:
+		return gl_extensions.supportsBC45 ? FMT_TEXTURE : 0;
+
+	case DataFormat::BC7_UNORM_BLOCK:
+		return gl_extensions.supportsBC7 ? FMT_TEXTURE : 0;
+
+	case DataFormat::ASTC_4x4_UNORM_BLOCK:
+		return gl_extensions.supportsASTC ? FMT_TEXTURE : 0;
+
+	case DataFormat::ETC2_R8G8B8_UNORM_BLOCK:
+	case DataFormat::ETC2_R8G8B8A1_UNORM_BLOCK:
+	case DataFormat::ETC2_R8G8B8A8_UNORM_BLOCK:
+		return gl_extensions.supportsETC2 ? FMT_TEXTURE : 0;
+
 	default:
 		return 0;
 	}

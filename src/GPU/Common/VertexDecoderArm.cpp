@@ -160,6 +160,7 @@ static const JitLookup jitLookup[] = {
 
 JittedVertexDecoder VertexDecoderJitCache::Compile(const VertexDecoder &dec, int32_t *jittedSize) {
 	dec_ = &dec;
+	BeginWrite(4096);
 	const u8 *start = AlignCode16();
 
 	bool prescaleStep = false;
@@ -253,6 +254,7 @@ JittedVertexDecoder VertexDecoderJitCache::Compile(const VertexDecoder &dec, int
 	PLD(srcReg, 64);
 	for (int i = 0; i < dec.numSteps_; i++) {
 		if (!CompileStep(dec, i)) {
+			EndWrite();
 			// Reset the code ptr and return zero to indicate that we failed.
 			ResetCodePtr(GetOffset(start));
 			char temp[1024] = {0};
@@ -287,7 +289,9 @@ JittedVertexDecoder VertexDecoderJitCache::Compile(const VertexDecoder &dec, int
 	dec.ToString(temp);
 	INFO_LOG(G3D, "%s", temp);
 	*/
+
 	*jittedSize = GetCodePtr() - start;
+	EndWrite();
 	return (JittedVertexDecoder)start;
 }
 

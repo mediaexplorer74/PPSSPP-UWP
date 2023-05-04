@@ -14,8 +14,10 @@
 
 #include <ppltasks.h>
 
-using namespace UWP;
+#include "UWPHelpers/LaunchItem.h"
 
+using namespace UWP;
+ 
 using namespace concurrency;
 using namespace Windows::ApplicationModel;
 using namespace Windows::ApplicationModel::Core;
@@ -196,35 +198,14 @@ void App::Load(Platform::String^ entryPoint) {
 
 // This method is called after the window becomes active.
 void App::Run() {
-    CoreWindow^ corewindow = CoreWindow::GetForCurrentThread();
 	while (!m_windowClosed) {
 		if (m_windowVisible) {
-			try {
-				if (corewindow) {
-					corewindow->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
-				}
-				else {
-					corewindow = CoreWindow::GetForCurrentThread();
-				}
-			}
-			catch (...) {
-
-			}
+			CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
 			if (m_main->Render()) {
 				m_deviceResources->Present();
 			}
 		} else {
-			try {
-				if (corewindow) {
-					corewindow->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessOneAndAllPending);
-				}
-				else {
-					corewindow = CoreWindow::GetForCurrentThread();
-				}
-			}
-			catch (...) {
-
-			}
+			CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessOneAndAllPending);
 		}
 	}
 }
@@ -235,11 +216,8 @@ void App::Run() {
 void App::Uninitialize() {
 }
 
-
-extern StorageFile^ launchFile;
- 
 // Application lifecycle event handlers.
-
+extern LaunchItem launchItem;
 void App::OnActivated(CoreApplicationView^ applicationView, IActivatedEventArgs^ args) {
 	// Run() won't start until the CoreWindow is activated.
 	CoreWindow::GetForCurrentThread()->Activate();
@@ -252,7 +230,12 @@ void App::OnActivated(CoreApplicationView^ applicationView, IActivatedEventArgs^
 
 	if (args->Kind == ActivationKind::File) {
 		FileActivatedEventArgs^ protocolArgs = dynamic_cast<Windows::ApplicationModel::Activation::FileActivatedEventArgs^>(args);
-		launchFile = (StorageFile^)protocolArgs->Files->GetAt(0);
+		launchItem = LaunchItem((StorageFile^)protocolArgs->Files->GetAt(0));
+	}
+	if (args->Kind == ActivationKind::Protocol)
+	{
+		ProtocolActivatedEventArgs^ protocolArgs = dynamic_cast<Windows::ApplicationModel::Activation::ProtocolActivatedEventArgs^>(args);
+		launchItem = LaunchItem(protocolArgs);
 	}
 }
 
@@ -265,9 +248,7 @@ void App::OnSuspending(Platform::Object^ sender, SuspendingEventArgs^ args) {
 	auto app = this;
 
 	create_task([app, deferral]() {
-#if !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
 		g_Config.Save("App::OnSuspending");
-#endif
 		app->m_deviceResources->Trim();
 		deferral->Complete();
 	});
@@ -305,15 +286,6 @@ void App::OnWindowSizeChanged(CoreWindow^ sender, WindowSizeChangedEventArgs^ ar
 }
 
 void App::OnVisibilityChanged(CoreWindow^ sender, VisibilityChangedEventArgs^ args) {
-
-	if (args->Visible == false) {
-		// MainScreen::OnExit and even App::OnWindowClosed
-		// doesn't seem to be called when closing the window
-		// Try to save the config here
-#if defined(NO_STORAGE_MANAGER)
-		g_Config.Save("App::OnVisibilityChanged");
-#endif
-	}
 	m_windowVisible = args->Visible;
 }
 
@@ -332,11 +304,9 @@ void App::OnDpiChanged(DisplayInformation^ sender, Object^ args) {
 	m_main->CreateWindowSizeDependentResources();
 }
 
-DisplayOrientations currentOrientation;
 void App::OnOrientationChanged(DisplayInformation^ sender, Object^ args) {
 	m_deviceResources->SetCurrentOrientation(sender->CurrentOrientation);
 	m_main->CreateWindowSizeDependentResources();
-	currentOrientation = sender->CurrentOrientation;
 }
 
 void App::OnDisplayContentsInvalidated(DisplayInformation^ sender, Object^ args) {

@@ -1,19 +1,22 @@
-// UWP STORAGE MANAGER
-// Copyright (c) 2023 Bashar Astifan.
-// Email: bashar@astifan.online
-// Telegram: @basharastifan
+// Copyright (c) 2023- PPSSPP Project.
 
-// This code must keep support for lower builds (15063+)
-// Try always to find possible way to keep that support
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 2.0 or later versions.
 
-// Functions:
-// ChooseFolder()
-// ChooseFile(std::vector<std::string> exts)
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License 2.0 for more details.
+
+// A copy of the GPL 2.0 should have been included with the program.
+// If not, see http://www.gnu.org/licenses/
+
+// Official git repository and contact information can be found at
+// https://github.com/hrydgard/ppsspp and http://www.ppsspp.org/.
 
 #include "pch.h"
 
-#include "StorageLog.h"
-#include "StorageExtensions.h"
 #include "StorageAsync.h"
 #include "StorageAccess.h"
 
@@ -32,12 +35,12 @@ concurrency::task<Platform::String^> PickSingleFolder()
 
 	return concurrency::create_task(folderPicker->PickSingleFolderAsync()).then([](StorageFolder^ folder) {
 		auto path = ref new Platform::String();
-	    if (folder != nullptr)
-	    {
+		if (folder != nullptr)
+		{
 			AddItemToFutureList(folder);
-	    	path = folder->Path;
-	    }
-	    return path;
+			path = folder->Path;
+		}
+		return path;
 	});
 }
 
@@ -50,7 +53,7 @@ concurrency::task<Platform::String^> PickSingleFile(std::vector<std::string> ext
 
 	if (exts.size() > 0) {
 		for each (auto ext in exts) {
-			filePicker->FileTypeFilter->Append(convert(ext));
+			filePicker->FileTypeFilter->Append(ToPlatformString(ext));
 		}
 	}
 	else
@@ -59,25 +62,25 @@ concurrency::task<Platform::String^> PickSingleFile(std::vector<std::string> ext
 	}
 	return concurrency::create_task(filePicker->PickSingleFileAsync()).then([](StorageFile^ file) {
 		auto path = ref new Platform::String();
-	    if (file != nullptr)
-	    {
+		if (file != nullptr)
+		{
 			AddItemToFutureList(file);
-	    	path = file->Path;
-	    }
-	    return path;
+			path = file->Path;
+		}
+		return path;
 	});
 }
 
 
 concurrency::task<std::string> ChooseFile(std::vector<std::string> exts) {
 	return PickSingleFile(exts).then([](Platform::String^ filePath) {
-		return convert(filePath);
+		return FromPlatformString(filePath);
 	});
 }
 
 concurrency::task<std::string> ChooseFolder() {
 	return PickSingleFolder().then([](Platform::String^ folderPath) {
-		return convert(folderPath);
+		return FromPlatformString(folderPath);
 	});
 
 }

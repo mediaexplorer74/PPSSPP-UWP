@@ -300,9 +300,6 @@
     <ClCompile Include="CoreTiming.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="Host.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="Loaders.cpp">
       <Filter>Core</Filter>
     </ClCompile>
@@ -651,9 +648,6 @@
     </ClCompile>
     <ClCompile Include="FileLoaders\RamCachingFileLoader.cpp">
       <Filter>FileLoaders</Filter>
-    </ClCompile>
-    <ClCompile Include="TextureReplacer.cpp">
-      <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="MIPS\IR\IRAsm.cpp">
       <Filter>MIPS\IR</Filter>
@@ -1195,6 +1189,15 @@
     <ClCompile Include="..\ext\riscv-disas.cpp">
       <Filter>Ext</Filter>
     </ClCompile>
+    <ClCompile Include="TiltEventProcessor.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\MIPSVFPUFallbacks.cpp">
+      <Filter>MIPS</Filter>
+    </ClCompile>
+    <ClCompile Include="ConfigSettings.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ELF\ElfReader.h">
@@ -1399,9 +1402,6 @@
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="CoreTiming.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Host.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="Loaders.h">
@@ -1734,9 +1734,6 @@
     <ClInclude Include="FileLoaders\RamCachingFileLoader.h">
       <Filter>FileLoaders</Filter>
     </ClInclude>
-    <ClInclude Include="TextureReplacer.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="MIPS\IR\IRJit.h">
       <Filter>MIPS\IR</Filter>
     </ClInclude>
@@ -1931,6 +1928,15 @@
     </ClInclude>
     <ClInclude Include="..\ext\riscv-disas.h">
       <Filter>Ext</Filter>
+    </ClInclude>
+    <ClInclude Include="TiltEventProcessor.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\MIPSVFPUFallbacks.h">
+      <Filter>MIPS</Filter>
+    </ClInclude>
+    <ClInclude Include="ConfigSettings.h">
+      <Filter>Core</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -159,12 +159,13 @@ static int Replace_memcpy() {
 	RETURN(destPtr);
 
 	if (MemBlockInfoDetailed(bytes)) {
-		const std::string tag = GetMemWriteTagAt("ReplaceMemcpy/", srcPtr, bytes);
-		NotifyMemInfo(MemBlockFlags::READ, srcPtr, bytes, tag.c_str(), tag.size());
-		NotifyMemInfo(MemBlockFlags::WRITE, destPtr, bytes, tag.c_str(), tag.size());
+		char tagData[128];
+		size_t tagSize = FormatMemWriteTagAt(tagData, sizeof(tagData), "ReplaceMemcpy/", srcPtr, bytes);
+		NotifyMemInfo(MemBlockFlags::READ, srcPtr, bytes, tagData, tagSize);
+		NotifyMemInfo(MemBlockFlags::WRITE, destPtr, bytes, tagData, tagSize);
 
 		// It's pretty common that games will copy video data.
-		if (tag == "ReplaceMemcpy/VideoDecode" || tag == "ReplaceMemcpy/VideoDecodeRange") {
+		if (!strcmp(tagData, "ReplaceMemcpy/VideoDecode") || !strcmp(tagData, "ReplaceMemcpy/VideoDecodeRange")) {
 			if (bytes == 512 * 272 * 4) {
 				gpu->PerformWriteFormattedFromMemory(destPtr, bytes, 512, GE_FORMAT_8888);
 			}
@@ -211,12 +212,13 @@ static int Replace_memcpy_jak() {
 	RETURN(destPtr);
 
 	if (MemBlockInfoDetailed(bytes)) {
-		const std::string tag = GetMemWriteTagAt("ReplaceMemcpy/", srcPtr, bytes);
-		NotifyMemInfo(MemBlockFlags::READ, srcPtr, bytes, tag.c_str(), tag.size());
-		NotifyMemInfo(MemBlockFlags::WRITE, destPtr, bytes, tag.c_str(), tag.size());
+		char tagData[128];
+		size_t tagSize = FormatMemWriteTagAt(tagData, sizeof(tagData), "ReplaceMemcpy/", srcPtr, bytes);
+		NotifyMemInfo(MemBlockFlags::READ, srcPtr, bytes, tagData, tagSize);
+		NotifyMemInfo(MemBlockFlags::WRITE, destPtr, bytes, tagData, tagSize);
 
 		// It's pretty common that games will copy video data.
-		if (tag == "ReplaceMemcpy/VideoDecode" || tag == "ReplaceMemcpy/VideoDecodeRange") {
+		if (!strcmp(tagData, "ReplaceMemcpy/VideoDecode") || !strcmp(tagData, "ReplaceMemcpy/VideoDecodeRange")) {
 			if (bytes == 512 * 272 * 4) {
 				gpu->PerformWriteFormattedFromMemory(destPtr, bytes, 512, GE_FORMAT_8888);
 			}
@@ -250,9 +252,10 @@ static int Replace_memcpy16() {
 	RETURN(destPtr);
 
 	if (MemBlockInfoDetailed(bytes)) {
-		const std::string tag = GetMemWriteTagAt("ReplaceMemcpy16/", srcPtr, bytes);
-		NotifyMemInfo(MemBlockFlags::READ, srcPtr, bytes, tag.c_str(), tag.size());
-		NotifyMemInfo(MemBlockFlags::WRITE, destPtr, bytes, tag.c_str(), tag.size());
+		char tagData[128];
+		size_t tagSize = FormatMemWriteTagAt(tagData, sizeof(tagData), "ReplaceMemcpy16/", srcPtr, bytes);
+		NotifyMemInfo(MemBlockFlags::READ, srcPtr, bytes, tagData, tagSize);
+		NotifyMemInfo(MemBlockFlags::WRITE, destPtr, bytes, tagData, tagSize);
 	}
 
 	return 10 + bytes / 4;  // approximation
@@ -291,9 +294,10 @@ static int Replace_memcpy_swizzled() {
 	RETURN(0);
 
 	if (MemBlockInfoDetailed(pitch * h)) {
-		const std::string tag = GetMemWriteTagAt("ReplaceMemcpySwizzle/", srcPtr, pitch * h);
-		NotifyMemInfo(MemBlockFlags::READ, srcPtr, pitch * h, tag.c_str(), tag.size());
-		NotifyMemInfo(MemBlockFlags::WRITE, destPtr, pitch * h, tag.c_str(), tag.size());
+		char tagData[128];
+		size_t tagSize = FormatMemWriteTagAt(tagData, sizeof(tagData), "ReplaceMemcpySwizzle/", srcPtr, pitch * h);
+		NotifyMemInfo(MemBlockFlags::READ, srcPtr, pitch * h, tagData, tagSize);
+		NotifyMemInfo(MemBlockFlags::WRITE, destPtr, pitch * h, tagData, tagSize);
 	}
 
 	return 10 + (pitch * h) / 4;  // approximation
@@ -322,9 +326,10 @@ static int Replace_memmove() {
 	RETURN(destPtr);
 
 	if (MemBlockInfoDetailed(bytes)) {
-		const std::string tag = GetMemWriteTagAt("ReplaceMemmove/", srcPtr, bytes);
-		NotifyMemInfo(MemBlockFlags::READ, srcPtr, bytes, tag.c_str(), tag.size());
-		NotifyMemInfo(MemBlockFlags::WRITE, destPtr, bytes, tag.c_str(), tag.size());
+		char tagData[128];
+		size_t tagSize = FormatMemWriteTagAt(tagData, sizeof(tagData), "ReplaceMemmove/", srcPtr, bytes);
+		NotifyMemInfo(MemBlockFlags::READ, srcPtr, bytes, tagData, tagSize);
+		NotifyMemInfo(MemBlockFlags::WRITE, destPtr, bytes, tagData, tagSize);
 	}
 
 	return 10 + bytes / 4;  // approximation
@@ -729,7 +734,7 @@ static int Hook_godseaterburst_depthmask_5551() {
 		// This is added to read from the linearized mirror.
 		uint32_t depthMirror = depthBuffer + 0x00200000;
 		// Depth download required, or it won't work and will be transparent.
-		gpu->PerformMemoryCopy(depthMirror, depthMirror, size, GPUCopyFlag::FORCE_DST_MEM | GPUCopyFlag::DEPTH_REQUESTED);
+		gpu->PerformMemoryCopy(depthMirror, depthMirror, size, GPUCopyFlag::FORCE_DST_MATCH_MEM | GPUCopyFlag::DEPTH_REQUESTED);
 		NotifyMemInfo(MemBlockFlags::WRITE, depthMirror, size, "godseaterburst_depthmask_5551");
 	}
 
@@ -764,7 +769,7 @@ static int Hook_starocean_write_stencil() {
 static int Hook_topx_create_saveicon() {
 	const u32 fb_address = currentMIPS->r[MIPS_REG_V0];
 	if (Memory::IsVRAMAddress(fb_address)) {
-		gpu->PerformReadbackToMemory(fb_address, 0x00044000);
+		gpu->PerformMemoryCopy(fb_address, fb_address, 0x00044000, GPUCopyFlag::FORCE_DST_MATCH_MEM | GPUCopyFlag::DISALLOW_CREATE_VFB);
 		NotifyMemInfo(MemBlockFlags::WRITE, fb_address, 0x00044000, "topx_create_saveicon");
 	}
 	return 0;
@@ -815,7 +820,7 @@ static int Hook_growlanser_create_saveicon() {
 	const u32 fmt = Memory::Read_U32(currentMIPS->r[MIPS_REG_SP]);
 	const u32 sz = fmt == GE_FORMAT_8888 ? 0x00088000 : 0x00044000;
 	if (Memory::IsVRAMAddress(fb_address) && fmt <= 3) {
-		gpu->PerformReadbackToMemory(fb_address, sz);
+		gpu->PerformMemoryCopy(fb_address, fb_address, sz, GPUCopyFlag::FORCE_DST_MATCH_MEM | GPUCopyFlag::DISALLOW_CREATE_VFB);
 		NotifyMemInfo(MemBlockFlags::WRITE, fb_address, sz, "growlanser_create_saveicon");
 	}
 	return 0;

@@ -34,10 +34,10 @@
 #include "Common/Log.h"
 #include "Core/Core.h"
 #include "Core/Config.h"
-#include "Core/Host.h"
 #include "Core/MemMap.h"
 #include "Core/SaveState.h"
 #include "Core/System.h"
+#include "Core/MemFault.h"
 #include "Core/Debugger/Breakpoints.h"
 #include "Core/HW/Display.h"
 #include "Core/MIPS/MIPS.h"
@@ -68,7 +68,7 @@ static double lastKeepAwake = 0.0;
 static GraphicsContext *graphicsContext;
 static bool powerSaving = false;
 
-static ExceptionInfo g_exceptionInfo;
+static MIPSExceptionInfo g_exceptionInfo;
 
 void Core_SetGraphicsContext(GraphicsContext *ctx) {
 	graphicsContext = ctx;
@@ -154,8 +154,8 @@ bool Core_GetPowerSaving() {
 
 static bool IsWindowSmall(int pixelWidth, int pixelHeight) {
 	// Can't take this from config as it will not be set if windows is maximized.
-	int w = (int)(pixelWidth * g_dpi_scale_x);
-	int h = (int)(pixelHeight * g_dpi_scale_y);
+	int w = (int)(pixelWidth * g_display.dpi_scale_x);
+	int h = (int)(pixelHeight * g_display.dpi_scale_y);
 	return g_Config.IsPortrait() ? (h < 480 + 80) : (w < 480 + 80);
 }
 
@@ -163,43 +163,42 @@ static bool IsWindowSmall(int pixelWidth, int pixelHeight) {
 bool UpdateScreenScale(int width, int height) {
 	bool smallWindow;
 #if defined(USING_QT_UI)
-	g_dpi = System_GetPropertyFloat(SYSPROP_DISPLAY_DPI);
+	g_display.dpi = System_GetPropertyFloat(SYSPROP_DISPLAY_DPI);
 	float g_logical_dpi = System_GetPropertyFloat(SYSPROP_DISPLAY_LOGICAL_DPI);
-	g_dpi_scale_x = g_logical_dpi / g_dpi;
-	g_dpi_scale_y = g_logical_dpi / g_dpi;
+	g_display.dpi_scale_x = g_logical_dpi / g_display.dpi;
+	g_display.dpi_scale_y = g_logical_dpi / g_display.dpi;
 #elif PPSSPP_PLATFORM(WINDOWS) && !PPSSPP_PLATFORM(UWP)
-	g_dpi = System_GetPropertyFloat(SYSPROP_DISPLAY_DPI);
-	g_dpi_scale_x = 96.0f / g_dpi;
-	g_dpi_scale_y = 96.0f / g_dpi;
+	g_display.dpi = System_GetPropertyFloat(SYSPROP_DISPLAY_DPI);
+	g_display.dpi_scale_x = 96.0f / g_display.dpi;
+	g_display.dpi_scale_y = 96.0f / g_display.dpi;
 #else
-	g_dpi = 96.0f;
-	g_dpi_scale_x = 1.0f;
-	g_dpi_scale_y = 1.0f;
+	g_display.dpi = 96.0f;
+	g_display.dpi_scale_x = 1.0f;
+	g_display.dpi_scale_y = 1.0f;
 #endif
-	g_dpi_scale_real_x = g_dpi_scale_x;
-	g_dpi_scale_real_y = g_dpi_scale_y;
+	g_display.dpi_scale_real_x = g_display.dpi_scale_x;
+	g_display.dpi_scale_real_y = g_display.dpi_scale_y;
 
 	smallWindow = IsWindowSmall(width, height);
 	if (smallWindow) {
-		g_dpi /= 2.0f;
-		g_dpi_scale_x *= 2.0f;
-		g_dpi_scale_y *= 2.0f;
+		g_display.dpi /= 2.0f;
+		g_display.dpi_scale_x *= 2.0f;
+		g_display.dpi_scale_y *= 2.0f;
 	}
-	pixel_in_dps_x = 1.0f / g_dpi_scale_x;
-	pixel_in_dps_y = 1.0f / g_dpi_scale_y;
+	g_display.pixel_in_dps_x = 1.0f / g_display.dpi_scale_x;
+	g_display.pixel_in_dps_y = 1.0f / g_display.dpi_scale_y;
 
-	int new_dp_xres = (int)(width * g_dpi_scale_x);
-	int new_dp_yres = (int)(height * g_dpi_scale_y);
+	int new_dp_xres = (int)(width * g_display.dpi_scale_x);
+	int new_dp_yres = (int)(height * g_display.dpi_scale_y);
 
-	bool dp_changed = new_dp_xres != dp_xres || new_dp_yres != dp_yres;
-	bool px_changed = pixel_xres != width || pixel_yres != height;
+	bool dp_changed = new_dp_xres != g_display.dp_xres || new_dp_yres != g_display.dp_yres;
+	bool px_changed = g_display.pixel_xres != width || g_display.pixel_yres != height;
 
 	if (dp_changed || px_changed) {
-		dp_xres = new_dp_xres;
-		dp_yres = new_dp_yres;
-		pixel_xres = width;
-		pixel_yres = height;
-		INFO_LOG(G3D, "pixel_res: %dx%d. Calling NativeResized()", pixel_xres, pixel_yres);
+		g_display.dp_xres = new_dp_xres;
+		g_display.dp_yres = new_dp_yres;
+		g_display.pixel_xres = width;
+		g_display.pixel_yres = height;
 		NativeResized();
 		return true;
 	}
@@ -309,8 +308,8 @@ void Core_ProcessStepping() {
 	static int lastSteppingCounter = -1;
 	if (lastSteppingCounter != steppingCounter) {
 		CBreakPoints::ClearTemporaryBreakPoints();
-		host->UpdateDisassembly();
-		host->UpdateMemView();
+		System_Notify(SystemNotification::DISASSEMBLY);
+		System_Notify(SystemNotification::MEM_VIEW);
 		lastSteppingCounter = steppingCounter;
 	}
 
@@ -321,21 +320,21 @@ void Core_ProcessStepping() {
 	if (doStep && coreState == CORE_STEPPING) {
 		Core_SingleStep();
 		// Update disasm dialog.
-		host->UpdateDisassembly();
-		host->UpdateMemView();
+		System_Notify(SystemNotification::DISASSEMBLY);
+		System_Notify(SystemNotification::MEM_VIEW);
 	}
 }
 
 // Many platforms, like Android, do not call this function but handle things on their own.
 // Instead they simply call NativeRender and NativeUpdate directly.
-void Core_Run(GraphicsContext *ctx) {
-	host->UpdateDisassembly();
+bool Core_Run(GraphicsContext *ctx) {
+	System_Notify(SystemNotification::DISASSEMBLY);
 	while (true) {
 		if (GetUIState() != UISTATE_INGAME) {
 			Core_StateProcessed();
 			if (GetUIState() == UISTATE_EXIT) {
 				UpdateRunLoop();
-				return;
+				return false;
 			}
 			Core_RunLoop(ctx);
 			continue;
@@ -348,7 +347,7 @@ void Core_Run(GraphicsContext *ctx) {
 			Core_RunLoop(ctx);
 			if (coreState == CORE_POWERDOWN) {
 				Core_StateProcessed();
-				return;
+				return true;
 			}
 			break;
 
@@ -359,30 +358,29 @@ void Core_Run(GraphicsContext *ctx) {
 			// Exit loop!!
 			Core_StateProcessed();
 
-			return;
+			return true;
 
 		case CORE_NEXTFRAME:
-			return;
+			return true;
 		}
 	}
 }
 
 void Core_EnableStepping(bool step, const char *reason, u32 relatedAddress) {
 	if (step) {
-		host->SetDebugMode(true);
 		Core_UpdateState(CORE_STEPPING);
 		steppingCounter++;
 		_assert_msg_(reason != nullptr, "No reason specified for break");
 		steppingReason = reason;
 		steppingAddress = relatedAddress;
 	} else {
-		host->SetDebugMode(false);
 		// Clear the exception if we resume.
 		Core_ResetException();
 		coreState = CORE_RUNNING;
 		coreStatePending = false;
 		m_StepCond.notify_all();
 	}
+	System_Notify(SystemNotification::DEBUG_MODE_CHANGE);
 }
 
 bool Core_NextFrame() {
@@ -405,11 +403,11 @@ SteppingReason Core_GetSteppingReason() {
 	return r;
 }
 
-const char *ExceptionTypeAsString(ExceptionType type) {
+const char *ExceptionTypeAsString(MIPSExceptionType type) {
 	switch (type) {
-	case ExceptionType::MEMORY: return "Invalid Memory Access";
-	case ExceptionType::BREAK: return "Break";
-	case ExceptionType::BAD_EXEC_ADDR: return "Bad Execution Address";
+	case MIPSExceptionType::MEMORY: return "Invalid Memory Access";
+	case MIPSExceptionType::BREAK: return "Break";
+	case MIPSExceptionType::BAD_EXEC_ADDR: return "Bad Execution Address";
 	default: return "N/A";
 	}
 }
@@ -446,19 +444,25 @@ void Core_MemoryException(u32 address, u32 accessSize, u32 pc, MemoryExceptionTy
 	}
 
 	if (!g_Config.bIgnoreBadMemAccess) {
-		ExceptionInfo &e = g_exceptionInfo;
+		// Try to fetch a call stack, to start with.
+		std::vector<MIPSStackWalk::StackFrame> stackFrames = WalkCurrentStack(-1);
+		std::string stackTrace = FormatStackTrace(stackFrames);
+		WARN_LOG(MEMMAP, "\n%s", stackTrace.c_str());
+
+		MIPSExceptionInfo &e = g_exceptionInfo;
 		e = {};
-		e.type = ExceptionType::MEMORY;
+		e.type = MIPSExceptionType::MEMORY;
 		e.info.clear();
 		e.memory_type = type;
 		e.address = address;
 		e.accessSize = accessSize;
+		e.stackTrace = stackTrace;
 		e.pc = pc;
 		Core_EnableStepping(true, "memory.exception", address);
 	}
 }
 
-void Core_MemoryExceptionInfo(u32 address, u32 pc, u32 accessSize, MemoryExceptionType type, std::string additionalInfo, bool forceReport) {
+void Core_MemoryExceptionInfo(u32 address, u32 accessSize, u32 pc, MemoryExceptionType type, std::string additionalInfo, bool forceReport) {
 	const char *desc = MemoryExceptionTypeAsString(type);
 	// In jit, we only flush PC when bIgnoreBadMemAccess is off.
 	if (g_Config.iCpuCore == (int)CPUCore::JIT && g_Config.bIgnoreBadMemAccess) {
@@ -468,12 +472,19 @@ void Core_MemoryExceptionInfo(u32 address, u32 pc, u32 accessSize, MemoryExcepti
 	}
 
 	if (!g_Config.bIgnoreBadMemAccess || forceReport) {
-		ExceptionInfo &e = g_exceptionInfo;
+		// Try to fetch a call stack, to start with.
+		std::vector<MIPSStackWalk::StackFrame> stackFrames = WalkCurrentStack(-1);
+		std::string stackTrace = FormatStackTrace(stackFrames);
+		WARN_LOG(MEMMAP, "\n%s", stackTrace.c_str());
+
+		MIPSExceptionInfo &e = g_exceptionInfo;
 		e = {};
-		e.type = ExceptionType::MEMORY;
+		e.type = MIPSExceptionType::MEMORY;
 		e.info = additionalInfo;
 		e.memory_type = type;
 		e.address = address;
+		e.accessSize = accessSize;
+		e.stackTrace = stackTrace;
 		e.pc = pc;
 		Core_EnableStepping(true, "memory.exception", address);
 	}
@@ -484,9 +495,9 @@ void Core_ExecException(u32 address, u32 pc, ExecExceptionType type) {
 	const char *desc = ExecExceptionTypeAsString(type);
 	WARN_LOG(MEMMAP, "%s: Invalid exec address %08x PC %08x LR %08x", desc, address, pc, currentMIPS->r[MIPS_REG_RA]);
 
-	ExceptionInfo &e = g_exceptionInfo;
+	MIPSExceptionInfo &e = g_exceptionInfo;
 	e = {};
-	e.type = ExceptionType::BAD_EXEC_ADDR;
+	e.type = MIPSExceptionType::BAD_EXEC_ADDR;
 	e.info.clear();
 	e.exec_type = type;
 	e.address = address;
@@ -500,9 +511,9 @@ void Core_ExecException(u32 address, u32 pc, ExecExceptionType type) {
 void Core_Break(u32 pc) {
 	ERROR_LOG(CPU, "BREAK!");
 
-	ExceptionInfo &e = g_exceptionInfo;
+	MIPSExceptionInfo &e = g_exceptionInfo;
 	e = {};
-	e.type = ExceptionType::BREAK;
+	e.type = MIPSExceptionType::BREAK;
 	e.info.clear();
 	e.pc = pc;
 
@@ -512,9 +523,9 @@ void Core_Break(u32 pc) {
 }
 
 void Core_ResetException() {
-	g_exceptionInfo.type = ExceptionType::NONE;
+	g_exceptionInfo.type = MIPSExceptionType::NONE;
 }
 
-const ExceptionInfo &Core_GetExceptionInfo() {
+const MIPSExceptionInfo &Core_GetExceptionInfo() {
 	return g_exceptionInfo;
 }

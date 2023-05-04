@@ -37,18 +37,21 @@
 #include "Common/StringUtils.h"
 #include "Common/System/Display.h"
 #include "Common/System/System.h"
+#include "Common/System/Request.h"
 #include "Common/TimeUtil.h"
 #include "Core/KeyMap.h"
-#include "Core/Host.h"
 #include "Core/HLE/sceCtrl.h"
 #include "Core/System.h"
 #include "Core/Config.h"
 #include "UI/ControlMappingScreen.h"
 #include "UI/GameSettingsScreen.h"
+#include "UI/JoystickHistoryView.h"
 
 #if PPSSPP_PLATFORM(ANDROID)
 #include "android/jni/app-android.h"
 #endif
+
+using KeyMap::MultiInputMapping;
 
 class SingleControlMapper : public UI::LinearLayout {
 public:
@@ -65,7 +68,7 @@ private:
 	UI::EventReturn OnReplace(UI::EventParams &params);
 	UI::EventReturn OnReplaceAll(UI::EventParams &params);
 
-	void MappedCallback(KeyDef key);
+	void MappedCallback(MultiInputMapping key);
 
 	enum Action {
 		NONE,
@@ -91,7 +94,7 @@ SingleControlMapper::SingleControlMapper(int pspKey, std::string keyName, Screen
 
 void SingleControlMapper::Refresh() {
 	Clear();
-	auto mc = GetI18NCategory("MappableControls");
+	auto mc = GetI18NCategory(I18NCat::MAPPABLECONTROLS);
 
 	std::map<std::string, ImageID> keyImages;
 	keyImages["Circle"] = ImageID("I_CIRCLE");
@@ -108,7 +111,7 @@ void SingleControlMapper::Refresh() {
 	float itemH = 55.0f;
 
 	float leftColumnWidth = 200;
-	float rightColumnWidth = 250;  // TODO: Should be flexible somehow. Maybe we need to implement Measure.
+	float rightColumnWidth = 350;  // TODO: Should be flexible somehow. Maybe we need to implement Measure.
 
 	LinearLayout *root = Add(new LinearLayout(ORIENT_HORIZONTAL, new LinearLayoutParams(FILL_PARENT, WRAP_CONTENT)));
 	root->SetSpacing(3.0f);
@@ -133,19 +136,17 @@ void SingleControlMapper::Refresh() {
 
 	LinearLayout *rightColumn = root->Add(new LinearLayout(ORIENT_VERTICAL, new LinearLayoutParams(rightColumnWidth, WRAP_CONTENT)));
 	rightColumn->SetSpacing(2.0f);
-	std::vector<KeyDef> mappings;
-	KeyMap::KeyFromPspButton(pspKey_, &mappings, false);
+	std::vector<MultiInputMapping> mappings;
+	KeyMap::InputMappingsFromPspButton(pspKey_, &mappings, false);
 
 	rows_.clear();
 	for (size_t i = 0; i < mappings.size(); i++) {
-		std::string deviceName = GetDeviceName(mappings[i].deviceId);
-		std::string keyName = KeyMap::GetKeyOrAxisName(mappings[i].keyCode);
-
+		std::string multiMappingString = mappings[i].ToVisualString();
 		LinearLayout *row = rightColumn->Add(new LinearLayout(ORIENT_HORIZONTAL, new LinearLayoutParams(FILL_PARENT, WRAP_CONTENT)));
 		row->SetSpacing(2.0f);
 		rows_.push_back(row);
 
-		Choice *c = row->Add(new Choice(deviceName + "." + keyName, new LinearLayoutParams(FILL_PARENT, itemH, 1.0f)));
+		Choice *c = row->Add(new Choice(multiMappingString, new LinearLayoutParams(FILL_PARENT, itemH, 1.0f)));
 		c->SetTag(StringFromFormat("%d_Change%d", (int)i, pspKey_));
 		c->OnClick.Handle(this, &SingleControlMapper::OnReplace);
 
@@ -161,14 +162,14 @@ void SingleControlMapper::Refresh() {
 	}
 }
 
-void SingleControlMapper::MappedCallback(KeyDef kdf) {
+void SingleControlMapper::MappedCallback(MultiInputMapping kdf) {
 	switch (action_) {
 	case ADD:
-		KeyMap::SetKeyMapping(pspKey_, kdf, false);
+		KeyMap::SetInputMapping(pspKey_, kdf, false);
 		addButton_->SetFocus();
 		break;
 	case REPLACEALL:
-		KeyMap::SetKeyMapping(pspKey_, kdf, true);
+		KeyMap::SetInputMapping(pspKey_, kdf, true);
 		replaceAllButton_->SetFocus();
 		break;
 	case REPLACEONE:
@@ -187,42 +188,38 @@ void SingleControlMapper::MappedCallback(KeyDef kdf) {
 		SetFocus();
 		break;
 	}
+	KeyMap::UpdateNativeMenuKeys();
 	g_Config.bMapMouse = false;
 }
 
 UI::EventReturn SingleControlMapper::OnReplace(UI::EventParams &params) {
 	actionIndex_ = atoi(params.v->Tag().c_str());
 	action_ = REPLACEONE;
-	auto km = GetI18NCategory("KeyMapping");
-	scrm_->push(new KeyMappingNewKeyDialog(pspKey_, true, std::bind(&SingleControlMapper::MappedCallback, this, std::placeholders::_1), km));
+	scrm_->push(new KeyMappingNewKeyDialog(pspKey_, true, std::bind(&SingleControlMapper::MappedCallback, this, std::placeholders::_1), I18NCat::KEYMAPPING));
 	return UI::EVENT_DONE;
 }
 
 UI::EventReturn SingleControlMapper::OnReplaceAll(UI::EventParams &params) {
 	action_ = REPLACEALL;
-	auto km = GetI18NCategory("KeyMapping");
-	scrm_->push(new KeyMappingNewKeyDialog(pspKey_, true, std::bind(&SingleControlMapper::MappedCallback, this, std::placeholders::_1), km));
+	scrm_->push(new KeyMappingNewKeyDialog(pspKey_, true, std::bind(&SingleControlMapper::MappedCallback, this, std::placeholders::_1), I18NCat::KEYMAPPING));
 	return UI::EVENT_DONE;
 }
 
 UI::EventReturn SingleControlMapper::OnAdd(UI::EventParams &params) {
 	action_ = ADD;
-	auto km = GetI18NCategory("KeyMapping");
-	scrm_->push(new KeyMappingNewKeyDialog(pspKey_, true, std::bind(&SingleControlMapper::MappedCallback, this, std::placeholders::_1), km));
+	scrm_->push(new KeyMappingNewKeyDialog(pspKey_, true, std::bind(&SingleControlMapper::MappedCallback, this, std::placeholders::_1), I18NCat::KEYMAPPING));
 	return UI::EVENT_DONE;
 }
 UI::EventReturn SingleControlMapper::OnAddMouse(UI::EventParams &params) {
 	action_ = ADD;
 	g_Config.bMapMouse = true;
-	auto km = GetI18NCategory("KeyMapping");
-	scrm_->push(new KeyMappingNewMouseKeyDialog(pspKey_, true, std::bind(&SingleControlMapper::MappedCallback, this, std::placeholders::_1), km));
+	scrm_->push(new KeyMappingNewMouseKeyDialog(pspKey_, true, std::bind(&SingleControlMapper::MappedCallback, this, std::placeholders::_1), I18NCat::KEYMAPPING));
 	return UI::EVENT_DONE;
 }
 
 UI::EventReturn SingleControlMapper::OnDelete(UI::EventParams &params) {
 	int index = atoi(params.v->Tag().c_str());
-	KeyMap::g_controllerMap[pspKey_].erase(KeyMap::g_controllerMap[pspKey_].begin() + index);
-	KeyMap::g_controllerMapGeneration++;
+	KeyMap::DeleteNthMapping(pspKey_, index);
 
 	if (index + 1 < (int)rows_.size())
 		rows_[index]->SetFocus();
@@ -235,7 +232,7 @@ void ControlMappingScreen::CreateViews() {
 	using namespace UI;
 	mappers_.clear();
 
-	auto km = GetI18NCategory("KeyMapping");
+	auto km = GetI18NCategory(I18NCat::KEYMAPPING);
 
 	root_ = new LinearLayout(ORIENT_HORIZONTAL);
 
@@ -284,8 +281,7 @@ void ControlMappingScreen::update() {
 }
 
 UI::EventReturn ControlMappingScreen::OnClearMapping(UI::EventParams &params) {
-	KeyMap::g_controllerMap.clear();
-	KeyMap::g_controllerMapGeneration++;
+	KeyMap::ClearAllMappings();
 	return UI::EVENT_DONE;
 }
 
@@ -300,7 +296,7 @@ UI::EventReturn ControlMappingScreen::OnAutoConfigure(UI::EventParams &params) {
 	for (auto s = seenPads.begin(), end = seenPads.end(); s != end; ++s) {
 		items.push_back(*s);
 	}
-	auto km = GetI18NCategory("KeyMapping");
+	auto km = GetI18NCategory(I18NCat::KEYMAPPING);
 	UI::ListPopupScreen *autoConfList = new UI::ListPopupScreen(km->T("Autoconfigure for device"), items, -1);
 	if (params.v)
 		autoConfList->SetPopupOrigin(params.v);
@@ -324,31 +320,44 @@ void ControlMappingScreen::dialogFinished(const Screen *dialog, DialogResult res
 void KeyMappingNewKeyDialog::CreatePopupContents(UI::ViewGroup *parent) {
 	using namespace UI;
 
-	auto km = GetI18NCategory("KeyMapping");
-	auto mc = GetI18NCategory("MappableControls");
+	auto km = GetI18NCategory(I18NCat::KEYMAPPING);
+	auto mc = GetI18NCategory(I18NCat::MAPPABLECONTROLS);
 
 	std::string pspButtonName = KeyMap::GetPspButtonName(this->pspBtn_);
 
-	parent->Add(new TextView(std::string(km->T("Map a new key for")) + " " + mc->T(pspButtonName), new LinearLayoutParams(Margins(10,0))));
+	parent->Add(new TextView(std::string(km->T("Map a new key for")) + " " + mc->T(pspButtonName), new LinearLayoutParams(Margins(10, 0))));
+	parent->Add(new TextView(std::string(mapping_.ToVisualString()), new LinearLayoutParams(Margins(10, 0))));
+
 	SetVRAppMode(VRAppMode::VR_CONTROLLER_MAPPING_MODE);
 }
 
 bool KeyMappingNewKeyDialog::key(const KeyInput &key) {
-	if (mapped_ || time_now_d() < delayUntil_)
-		return false;
+	if (time_now_d() < delayUntil_)
+		return true;
 	if (key.flags & KEY_DOWN) {
 		if (key.keyCode == NKCODE_EXT_MOUSEBUTTON_1) {
+			// Don't map
 			return true;
 		}
-		// Only map analog values to this mapping.
-		if (pspBtn_ == VIRTKEY_SPEED_ANALOG && !UI::IsEscapeKey(key))
-			return true;
 
-		mapped_ = true;
-		KeyDef kdf(key.deviceId, key.keyCode);
+		if (pspBtn_ == VIRTKEY_SPEED_ANALOG && !UI::IsEscapeKey(key)) {
+			// Only map analog values to this mapping.
+			return true;
+		}
+
+		InputMapping newMapping(key.deviceId, key.keyCode);
+
+		if (!(key.flags & KEY_IS_REPEAT)) {
+			if (!mapping_.mappings.contains(newMapping)) {
+				mapping_.mappings.push_back(newMapping);
+				RecreateViews();
+			}
+		}
+	}
+	if (key.flags & KEY_UP) {
+		if (callback_)
+			callback_(mapping_);
 		TriggerFinish(DR_YES);
-		if (callback_ && pspBtn_ != VIRTKEY_SPEED_ANALOG)
-			callback_(kdf);
 	}
 	return true;
 }
@@ -360,7 +369,7 @@ void KeyMappingNewKeyDialog::SetDelay(float t) {
 void KeyMappingNewMouseKeyDialog::CreatePopupContents(UI::ViewGroup *parent) {
 	using namespace UI;
 
-	auto km = GetI18NCategory("KeyMapping");
+	auto km = GetI18NCategory(I18NCat::KEYMAPPING);
 
 	parent->Add(new TextView(std::string(km->T("You can press ESC to cancel.")), new LinearLayoutParams(Margins(10, 0))));
 	SetVRAppMode(VRAppMode::VR_CONTROLLER_MAPPING_MODE);
@@ -377,7 +386,7 @@ bool KeyMappingNewMouseKeyDialog::key(const KeyInput &key) {
 		}
 
 		mapped_ = true;
-		KeyDef kdf(key.deviceId, key.keyCode);
+		MultiInputMapping kdf(InputMapping(key.deviceId, key.keyCode));
 		TriggerFinish(DR_YES);
 		g_Config.bMapMouse = false;
 		if (callback_)
@@ -388,17 +397,11 @@ bool KeyMappingNewMouseKeyDialog::key(const KeyInput &key) {
 
 static bool IgnoreAxisForMapping(int axis) {
 	switch (axis) {
-		// Ignore the accelerometer for mapping for now.
 	case JOYSTICK_AXIS_ACCELEROMETER_X:
 	case JOYSTICK_AXIS_ACCELEROMETER_Y:
 	case JOYSTICK_AXIS_ACCELEROMETER_Z:
-		return true;
-
-		// Also ignore some weird axis events we get on Ouya.
-	case JOYSTICK_AXIS_OUYA_UNKNOWN1:
-	case JOYSTICK_AXIS_OUYA_UNKNOWN2:
-	case JOYSTICK_AXIS_OUYA_UNKNOWN3:
-	case JOYSTICK_AXIS_OUYA_UNKNOWN4:
+		// Ignore the accelerometer for mapping for now.
+		// We use tilt control for these.
 		return true;
 
 	default:
@@ -406,27 +409,35 @@ static bool IgnoreAxisForMapping(int axis) {
 	}
 }
 
-
 void KeyMappingNewKeyDialog::axis(const AxisInput &axis) {
-	if (mapped_ || time_now_d() < delayUntil_)
+	if (time_now_d() < delayUntil_)
 		return;
 	if (IgnoreAxisForMapping(axis.axisId))
 		return;
 
 	if (axis.value > AXIS_BIND_THRESHOLD) {
-		mapped_ = true;
-		KeyDef kdf(axis.deviceId, KeyMap::TranslateKeyCodeFromAxis(axis.axisId, 1));
-		TriggerFinish(DR_YES);
-		if (callback_)
-			callback_(kdf);
-	}
-
-	if (axis.value < -AXIS_BIND_THRESHOLD) {
-		mapped_ = true;
-		KeyDef kdf(axis.deviceId, KeyMap::TranslateKeyCodeFromAxis(axis.axisId, -1));
-		TriggerFinish(DR_YES);
-		if (callback_)
-			callback_(kdf);
+		InputMapping mapping(axis.deviceId, axis.axisId, 1);
+		triggeredAxes_.insert(mapping);
+		if (!mapping_.mappings.contains(mapping)) {
+			mapping_.mappings.push_back(mapping);
+			RecreateViews();
+		}
+	} else if (axis.value < -AXIS_BIND_THRESHOLD) {
+		InputMapping mapping(axis.deviceId, axis.axisId, -1);
+		triggeredAxes_.insert(mapping);
+		if (!mapping_.mappings.contains(mapping)) {
+			mapping_.mappings.push_back(mapping);
+			RecreateViews();
+		}
+	} else if (fabsf(axis.value) < AXIS_BIND_RELEASE_THRESHOLD) {
+		InputMapping neg(axis.deviceId, axis.axisId, -1);
+		InputMapping pos(axis.deviceId, axis.axisId, 1);
+		if (triggeredAxes_.find(neg) != triggeredAxes_.end() || triggeredAxes_.find(pos) != triggeredAxes_.end()) {
+			// "Key-up" the axis.
+			TriggerFinish(DR_YES);
+			if (callback_)
+				callback_(mapping_);
+		}
 	}
 }
 
@@ -438,7 +449,7 @@ void KeyMappingNewMouseKeyDialog::axis(const AxisInput &axis) {
 
 	if (axis.value > AXIS_BIND_THRESHOLD) {
 		mapped_ = true;
-		KeyDef kdf(axis.deviceId, KeyMap::TranslateKeyCodeFromAxis(axis.axisId, 1));
+		MultiInputMapping kdf(InputMapping(axis.deviceId, axis.axisId, 1));
 		TriggerFinish(DR_YES);
 		if (callback_)
 			callback_(kdf);
@@ -446,148 +457,26 @@ void KeyMappingNewMouseKeyDialog::axis(const AxisInput &axis) {
 
 	if (axis.value < -AXIS_BIND_THRESHOLD) {
 		mapped_ = true;
-		KeyDef kdf(axis.deviceId, KeyMap::TranslateKeyCodeFromAxis(axis.axisId, -1));
+		MultiInputMapping kdf(InputMapping(axis.deviceId, axis.axisId, -1));
 		TriggerFinish(DR_YES);
 		if (callback_)
 			callback_(kdf);
 	}
 }
 
-enum class StickHistoryViewType {
-	INPUT,
-	OUTPUT
-};
-
-class JoystickHistoryView : public UI::InertView {
-public:
-	JoystickHistoryView(StickHistoryViewType type, std::string title, UI::LayoutParams *layoutParams = nullptr)
-		: UI::InertView(layoutParams), title_(title), type_(type) {}
-	void Draw(UIContext &dc) override;
-	std::string DescribeText() const override { return "Analog Stick View"; }
-	void Update() override;
-	void SetXY(float x, float y) {
-		curX_ = x;
-		curY_ = y;
-	}
-
-private:
-	struct Location {
-		float x;
-		float y;
-	};
-
-	float curX_ = 0.0f;
-	float curY_ = 0.0f;
-
-	std::deque<Location> locations_;
-	int maxCount_ = 500;
-	std::string title_;
-	StickHistoryViewType type_;
-};
-
-void JoystickHistoryView::Draw(UIContext &dc) {
-	const AtlasImage *image = dc.Draw()->GetAtlas()->getImage(ImageID("I_CROSS"));
-	if (!image) {
-		return;
-	}
-	float minRadius = std::min(bounds_.w, bounds_.h) * 0.5f - image->w;
-	dc.Begin();
-	Bounds textBounds(bounds_.x, bounds_.centerY() + minRadius + 5.0, bounds_.w, bounds_.h/2 - minRadius - 5.0);
-	dc.DrawTextShadowRect(title_.c_str(), textBounds, 0xFFFFFFFF, ALIGN_TOP | ALIGN_HCENTER | FLAG_WRAP_TEXT);
-	dc.Flush();
-	dc.BeginNoTex();
-	dc.Draw()->RectOutline(bounds_.centerX() - minRadius, bounds_.centerY() - minRadius, minRadius * 2.0f, minRadius * 2.0f, 0x80FFFFFF);
-	dc.Flush();
-	dc.Begin();
-
-	// First draw a grid.
-	float dx = 1.0f / 10.0f;
-	for (int ix = -10; ix <= 10; ix++) {
-		// First draw vertical lines.
-		float fx = ix * dx;
-		for (int iy = -10; iy < 10; iy++) {
-			float ax = fx;
-			float ay = iy * dx;
-			float bx = fx;
-			float by = (iy + 1) * dx;
-
-			if (type_ == StickHistoryViewType::OUTPUT) {
-				ConvertAnalogStick(ax, ay);
-				ConvertAnalogStick(bx, by);
-			}
-
-			ax = ax * minRadius + bounds_.centerX();
-			ay = ay * minRadius + bounds_.centerY();
-
-			bx = bx * minRadius + bounds_.centerX();
-			by = by * minRadius + bounds_.centerY();
-
-			dc.Draw()->Line(dc.theme->whiteImage, ax, ay, bx, by, 1.0, 0x70FFFFFF);
-		}
-	}
-
-	for (int iy = -10; iy <= 10; iy++) {
-		// Then horizontal.
-		float fy = iy * dx;
-		for (int ix = -10; ix < 10; ix++) {
-			float ax = ix * dx;
-			float ay = fy;
-			float bx = (ix + 1) * dx;
-			float by = fy;
-
-			if (type_ == StickHistoryViewType::OUTPUT) {
-				ConvertAnalogStick(ax, ay);
-				ConvertAnalogStick(bx, by);
-			}
-
-			ax = ax * minRadius + bounds_.centerX();
-			ay = ay * minRadius + bounds_.centerY();
-
-			bx = bx * minRadius + bounds_.centerX();
-			by = by * minRadius + bounds_.centerY();
-
-			dc.Draw()->Line(dc.theme->whiteImage, ax, ay, bx, by, 1.0, 0x70FFFFFF);
-		}
-	}
-
-
-	int a = maxCount_ - (int)locations_.size();
-	for (auto iter = locations_.begin(); iter != locations_.end(); ++iter) {
-		float x = bounds_.centerX() + minRadius * iter->x;
-		float y = bounds_.centerY() - minRadius * iter->y;
-		float alpha = (float)a / (float)(maxCount_ - 1);
-		if (alpha < 0.0f) {
-			alpha = 0.0f;
-		}
-		// Emphasize the newest (higher) ones.
-		alpha = powf(alpha, 3.7f);
-		// Highlight the output.
-		if (alpha >= 1.0f && type_ == StickHistoryViewType::OUTPUT) {
-			dc.Draw()->DrawImage(ImageID("I_CIRCLE"), x, y, 1.0f, colorAlpha(0xFFFFFF, 1.0), ALIGN_CENTER);
-		} else {
-			dc.Draw()->DrawImage(ImageID("I_CIRCLE"), x, y, 0.8f, colorAlpha(0xC0C0C0, alpha * 0.5f), ALIGN_CENTER);
-		}
-		a++;
-	}
-	dc.Flush();
-}
-
-void JoystickHistoryView::Update() {
-	locations_.push_back(Location{ curX_, curY_ });
-	if ((int)locations_.size() > maxCount_) {
-		locations_.pop_front();
-	}
-}
-
 AnalogSetupScreen::AnalogSetupScreen(const Path &gamePath) : UIDialogScreenWithGameBackground(gamePath) {
-	mapper_.SetCallbacks([](int vkey) {}, [](int vkey) {}, [&](int stick, float x, float y) {
-		analogX_[stick] = x;
-		analogY_[stick] = y;
-	});
-	mapper_.SetRawCallback([&](int stick, float x, float y) {
-		rawX_[stick] = x;
-		rawY_[stick] = y;
-	});
+	mapper_.SetCallbacks(
+		[](int vkey, bool down) {},
+		[](int vkey, float analogValue) {},
+		[&](uint32_t bitsToSet, uint32_t bitsToClear) {},
+		[&](int stick, float x, float y) {
+			analogX_[stick] = x;
+			analogY_[stick] = y;
+		},
+		[&](int stick, float x, float y) {
+			rawX_[stick] = x;
+			rawY_[stick] = y;
+		});
 }
 
 void AnalogSetupScreen::update() {
@@ -628,14 +517,14 @@ void AnalogSetupScreen::axis(const AxisInput &axis) {
 void AnalogSetupScreen::CreateViews() {
 	using namespace UI;
 
-	auto di = GetI18NCategory("Dialog");
+	auto di = GetI18NCategory(I18NCat::DIALOG);
 
 	root_ = new LinearLayout(ORIENT_HORIZONTAL);
 
 	LinearLayout *leftColumn = root_->Add(new LinearLayout(ORIENT_VERTICAL, new LinearLayoutParams(300.0f, FILL_PARENT)));
 	LinearLayout *rightColumn = root_->Add(new LinearLayout(ORIENT_VERTICAL, new LinearLayoutParams(1.0f)));
 
-	auto co = GetI18NCategory("Controls");
+	auto co = GetI18NCategory(I18NCat::CONTROLS);
 	ScrollView *scroll = leftColumn->Add(new ScrollView(ORIENT_VERTICAL, new LinearLayoutParams(1.0)));
 
 	LinearLayout *scrollContents = scroll->Add(new LinearLayout(ORIENT_VERTICAL, new LinearLayoutParams(300.0f, WRAP_CONTENT)));
@@ -643,12 +532,12 @@ void AnalogSetupScreen::CreateViews() {
 	scrollContents->Add(new ItemHeader(co->T("Analog Settings", "Analog Settings")));
 
 	// TODO: Would be nicer if these didn't pop up...
-	scrollContents->Add(new PopupSliderChoiceFloat(&g_Config.fAnalogDeadzone, 0.0f, 0.5f, co->T("Deadzone radius"), 0.01f, screenManager(), "/ 1.0"));
-	scrollContents->Add(new PopupSliderChoiceFloat(&g_Config.fAnalogInverseDeadzone, 0.0f, 1.0f, co->T("Low end radius"), 0.01f, screenManager(), "/ 1.0"));
-	scrollContents->Add(new PopupSliderChoiceFloat(&g_Config.fAnalogSensitivity, 0.0f, 2.0f, co->T("Sensitivity (scale)", "Sensitivity"), 0.01f, screenManager(), "x"));
+	scrollContents->Add(new PopupSliderChoiceFloat(&g_Config.fAnalogDeadzone, 0.0f, 0.5f, 0.15f, co->T("Deadzone radius"), 0.01f, screenManager(), "/ 1.0"));
+	scrollContents->Add(new PopupSliderChoiceFloat(&g_Config.fAnalogInverseDeadzone, 0.0f, 1.0f, 0.0f, co->T("Low end radius"), 0.01f, screenManager(), "/ 1.0"));
+	scrollContents->Add(new PopupSliderChoiceFloat(&g_Config.fAnalogSensitivity, 0.0f, 2.0f, 1.1f, co->T("Sensitivity (scale)", "Sensitivity"), 0.01f, screenManager(), "x"));
 	// TODO: This should probably be a slider.
 	scrollContents->Add(new CheckBox(&g_Config.bAnalogIsCircular, co->T("Circular stick input")));
-	scrollContents->Add(new PopupSliderChoiceFloat(&g_Config.fAnalogAutoRotSpeed, 0.0f, 20.0f, co->T("Auto-rotation speed"), 1.0f, screenManager()));
+	scrollContents->Add(new PopupSliderChoiceFloat(&g_Config.fAnalogAutoRotSpeed, 0.1f, 20.0f, 8.0f, co->T("Auto-rotation speed"), 1.0f, screenManager()));
 	scrollContents->Add(new Choice(co->T("Reset to defaults")))->OnClick.Handle(this, &AnalogSetupScreen::OnResetToDefaults);
 
 	LinearLayout *theTwo = new LinearLayout(ORIENT_HORIZONTAL, new LinearLayoutParams(1.0f));
@@ -724,8 +613,8 @@ void TouchTestScreen::touch(const TouchInput &touch) {
 void TouchTestScreen::CreateViews() {
 	using namespace UI;
 
-	auto di = GetI18NCategory("Dialog");
-	auto gr = GetI18NCategory("Graphics");
+	auto di = GetI18NCategory(I18NCat::DIALOG);
+	auto gr = GetI18NCategory(I18NCat::GRAPHICS);
 	root_ = new LinearLayout(ORIENT_VERTICAL);
 	LinearLayout *theTwo = new LinearLayout(ORIENT_VERTICAL, new LinearLayoutParams(1.0f));
 
@@ -737,7 +626,7 @@ void TouchTestScreen::CreateViews() {
 
 #if !PPSSPP_PLATFORM(UWP)
 	static const char *renderingBackend[] = { "OpenGL", "Direct3D 9", "Direct3D 11", "Vulkan" };
-	PopupMultiChoice *renderingBackendChoice = root_->Add(new PopupMultiChoice(&g_Config.iGPUBackend, gr->T("Backend"), renderingBackend, (int)GPUBackend::OPENGL, ARRAY_SIZE(renderingBackend), gr->GetName(), screenManager()));
+	PopupMultiChoice *renderingBackendChoice = root_->Add(new PopupMultiChoice(&g_Config.iGPUBackend, gr->T("Backend"), renderingBackend, (int)GPUBackend::OPENGL, ARRAY_SIZE(renderingBackend), I18NCat::GRAPHICS, screenManager()));
 	renderingBackendChoice->OnChoice.Handle(this, &TouchTestScreen::OnRenderingBackend);
 
 	if (!g_Config.IsBackendEnabled(GPUBackend::OPENGL))
@@ -816,7 +705,7 @@ void TouchTestScreen::render() {
 		if (touches_[i].id != -1) {
 			ui_context->Draw()->Circle(touches_[i].x, touches_[i].y, 100.0, 3.0, 80, 0.0f, 0xFFFFFFFF, 1.0);
 			snprintf(buffer, sizeof(buffer), "%0.1fx%0.1f", touches_[i].x, touches_[i].y);
-			ui_context->DrawText(buffer, touches_[i].x, touches_[i].y + (touches_[i].y > dp_yres - 100.0f ? -135.0f : 95.0f), 0xFFFFFFFF, ALIGN_HCENTER | FLAG_DYNAMIC_ASCII);
+			ui_context->DrawText(buffer, touches_[i].x, touches_[i].y + (touches_[i].y > g_display.dp_yres - 100.0f ? -135.0f : 95.0f), 0xFFFFFFFF, ALIGN_HCENTER | FLAG_DYNAMIC_ASCII);
 		}
 	}
 
@@ -836,11 +725,11 @@ void TouchTestScreen::render() {
 #if PPSSPP_PLATFORM(ANDROID)
 		display_xres, display_yres,
 #endif
-		dp_xres, dp_yres,
-		pixel_xres, pixel_yres,
-		g_dpi,
-		g_dpi_scale_x, g_dpi_scale_y,
-		g_dpi_scale_real_x, g_dpi_scale_real_y, extra_debug);
+		g_display.dp_xres, g_display.dp_yres,
+		g_display.pixel_xres, g_display.pixel_yres,
+		g_display.dpi,
+		g_display.dpi_scale_x, g_display.dpi_scale_y,
+		g_display.dpi_scale_real_x, g_display.dpi_scale_real_y, extra_debug);
 
 	// On Android, also add joystick debug data.
 
@@ -849,16 +738,26 @@ void TouchTestScreen::render() {
 	ui_context->Flush();
 }
 
-void RecreateActivity();
+void RecreateActivity() {
+	const int SYSTEM_JELLYBEAN = 16;
+	if (System_GetPropertyInt(SYSPROP_SYSTEMVERSION) >= SYSTEM_JELLYBEAN) {
+		INFO_LOG(SYSTEM, "Sending recreate");
+		System_Notify(SystemNotification::FORCE_RECREATE_ACTIVITY);
+		INFO_LOG(SYSTEM, "Got back from recreate");
+	} else {
+		auto gr = GetI18NCategory(I18NCat::GRAPHICS);
+		System_Toast(gr->T("Must Restart", "You must restart PPSSPP for this change to take effect"));
+	}
+}
 
 UI::EventReturn TouchTestScreen::OnImmersiveModeChange(UI::EventParams &e) {
-	System_SendMessage("immersive", "");
+	System_Notify(SystemNotification::IMMERSIVE_MODE_CHANGE);
 	return UI::EVENT_DONE;
 }
 
 UI::EventReturn TouchTestScreen::OnRenderingBackend(UI::EventParams &e) {
 	g_Config.Save("GameSettingsScreen::RenderingBackend");
-	System_SendMessage("graphics_restart", "--touchscreentest");
+	System_RestartApp("--touchscreentest");
 	return UI::EVENT_DONE;
 }
 
@@ -970,6 +869,12 @@ public:
 		if (img_.isValid()) {
 			scales[0] *= scaleX_;
 			scales[1] *= scaleY_;
+			if (timeLastPressed_ >= 0.0) {
+				double sincePress = time_now_d() - timeLastPressed_;
+				if (sincePress < 1.0) {
+					c = colorBlend(c, dc.theme->itemDownStyle.background.color, (float)sincePress);
+				}
+			}
 			dc.Draw()->DrawImageRotatedStretch(img_, bounds_.Offset(offsetX_, offsetY_), scales, angle_, c);
 		}
 	}
@@ -1010,6 +915,10 @@ public:
 		return button_;
 	}
 
+	void NotifyPressed() {
+		timeLastPressed_ = time_now_d();
+	}
+
 private:
 	int button_;
 	ImageID img_;
@@ -1021,6 +930,7 @@ private:
 	float offsetY_ = 0.0f;
 	bool flipHBG_ = false;
 	int *selectedButton_ = nullptr;
+	double timeLastPressed_ = -1.0;
 };
 
 class MockPSP : public UI::AnchorLayout {
@@ -1030,7 +940,10 @@ public:
 	MockPSP(UI::LayoutParams *layoutParams = nullptr);
 	void SelectButton(int btn);
 	void FocusButton(int btn);
+	void NotifyPressed(int btn);
 	float GetPopupOffset();
+
+	bool SubviewFocused(View *view) override;
 
 	UI::Event ButtonClick;
 
@@ -1042,6 +955,7 @@ private:
 	UI::EventReturn OnSelectButton(UI::EventParams &e);
 
 	std::unordered_map<int, MockButton *> buttons_;
+	UI::TextView *labelView_ = nullptr;
 	int selectedButton_ = 0;
 };
 
@@ -1070,6 +984,10 @@ MockPSP::MockPSP(UI::LayoutParams *layoutParams) : AnchorLayout(layoutParams) {
 	AddButton(CTRL_CIRCLE, ImageID("I_CIRCLE"), ImageID("I_ROUND_LINE"), 0.0f, LayoutSize(23.0f, 23.0f, 446.0f, 74.0f))->SetScale(0.7f);
 	AddButton(CTRL_CROSS, ImageID("I_CROSS"), ImageID("I_ROUND_LINE"), 0.0f, LayoutSize(23.0f, 23.0f, 419.0f, 102.0f))->SetScale(0.7f);
 	AddButton(CTRL_SQUARE, ImageID("I_SQUARE"), ImageID("I_ROUND_LINE"), 0.0f, LayoutSize(23.0f, 23.0f, 392.0f, 74.0f))->SetScale(0.7f);
+
+	labelView_ = Add(new UI::TextView(""));
+	labelView_->SetShadow(true);
+	labelView_->SetVisibility(UI::V_GONE);
 }
 
 void MockPSP::SelectButton(int btn) {
@@ -1077,9 +995,31 @@ void MockPSP::SelectButton(int btn) {
 }
 
 void MockPSP::FocusButton(int btn) {
-	MockButton *view = buttons_[selectedButton_];
-	if (view)
+	MockButton *view = buttons_[btn];
+	if (view) {
 		view->SetFocus();
+	} else {
+		labelView_->SetVisibility(UI::V_GONE);
+	}
+}
+
+void MockPSP::NotifyPressed(int btn) {
+	MockButton *view = buttons_[btn];
+	if (view)
+		view->NotifyPressed();
+}
+
+bool MockPSP::SubviewFocused(View *view) {
+	for (auto it : buttons_) {
+		if (view == it.second) {
+			labelView_->SetVisibility(UI::V_VISIBLE);
+			labelView_->SetText(KeyMap::GetPspButtonName(it.first));
+
+			const Bounds &pos = view->GetBounds().Offset(-GetBounds().x, -GetBounds().y);
+			labelView_->ReplaceLayoutParams(new UI::AnchorLayoutParams(pos.centerX(), pos.y2() + 5, UI::NONE, UI::NONE));
+		}
+	}
+	return AnchorLayout::SubviewFocused(view);
 }
 
 float MockPSP::GetPopupOffset() {
@@ -1138,7 +1078,7 @@ static std::vector<int> bindAllOrder{
 void VisualMappingScreen::CreateViews() {
 	using namespace UI;
 
-	auto km = GetI18NCategory("KeyMapping");
+	auto km = GetI18NCategory(I18NCat::KEYMAPPING);
 
 	root_ = new LinearLayout(ORIENT_HORIZONTAL);
 
@@ -1162,6 +1102,50 @@ void VisualMappingScreen::CreateViews() {
 	root_->Add(rightColumn);
 }
 
+bool VisualMappingScreen::key(const KeyInput &key) {
+	if (key.flags & KEY_DOWN) {
+		std::vector<int> pspKeys;
+		KeyMap::InputMappingToPspButton(InputMapping(key.deviceId, key.keyCode), &pspKeys);
+		for (int pspKey : pspKeys) {
+			switch (pspKey) {
+			case VIRTKEY_AXIS_X_MIN:
+			case VIRTKEY_AXIS_Y_MIN:
+			case VIRTKEY_AXIS_X_MAX:
+			case VIRTKEY_AXIS_Y_MAX:
+				psp_->NotifyPressed(VIRTKEY_AXIS_Y_MAX);
+				break;
+			default:
+				psp_->NotifyPressed(pspKey);
+				break;
+			}
+		}
+	}
+	return UIDialogScreenWithGameBackground::key(key);
+}
+
+void VisualMappingScreen::axis(const AxisInput &axis) {
+	std::vector<int> results;
+	if (axis.value >= g_Config.fAnalogDeadzone * 0.7f)
+		KeyMap::InputMappingToPspButton(InputMapping(axis.deviceId, axis.axisId, 1), &results);
+	if (axis.value <= g_Config.fAnalogDeadzone * -0.7f)
+		KeyMap::InputMappingToPspButton(InputMapping(axis.deviceId, axis.axisId, -1), &results);
+
+	for (int result : results) {
+		switch (result) {
+		case VIRTKEY_AXIS_X_MIN:
+		case VIRTKEY_AXIS_Y_MIN:
+		case VIRTKEY_AXIS_X_MAX:
+		case VIRTKEY_AXIS_Y_MAX:
+			psp_->NotifyPressed(VIRTKEY_AXIS_Y_MAX);
+			break;
+		default:
+			psp_->NotifyPressed(result);
+			break;
+		}
+	}
+	UIDialogScreenWithGameBackground::axis(axis);
+}
+
 void VisualMappingScreen::resized() {
 	UIDialogScreenWithGameBackground::resized();
 	RecreateViews();
@@ -1180,8 +1164,9 @@ UI::EventReturn VisualMappingScreen::OnBindAll(UI::EventParams &e) {
 	return UI::EVENT_DONE;
 }
 
-void VisualMappingScreen::HandleKeyMapping(KeyDef key) {
-	KeyMap::SetKeyMapping(nextKey_, key, replace_);
+void VisualMappingScreen::HandleKeyMapping(MultiInputMapping key) {
+	KeyMap::SetInputMapping(nextKey_, key, replace_);
+	KeyMap::UpdateNativeMenuKeys();
 
 	if (bindAll_ < 0) {
 		// For analog, we do each direction in a row.
@@ -1221,14 +1206,12 @@ void VisualMappingScreen::dialogFinished(const Screen *dialog, DialogResult resu
 }
 
 void VisualMappingScreen::MapNext(bool successive) {
-	auto km = GetI18NCategory("KeyMapping");
-
 	if (nextKey_ == VIRTKEY_AXIS_Y_MIN || nextKey_ == VIRTKEY_AXIS_X_MIN || nextKey_ == VIRTKEY_AXIS_X_MAX) {
 		psp_->SelectButton(VIRTKEY_AXIS_Y_MAX);
 	} else {
 		psp_->SelectButton(nextKey_);
 	}
-	auto dialog = new KeyMappingNewKeyDialog(nextKey_, true, std::bind(&VisualMappingScreen::HandleKeyMapping, this, std::placeholders::_1), km);
+	auto dialog = new KeyMappingNewKeyDialog(nextKey_, true, std::bind(&VisualMappingScreen::HandleKeyMapping, this, std::placeholders::_1), I18NCat::KEYMAPPING);
 
 	Bounds bounds = screenManager()->getUIContext()->GetLayoutBounds();
 	dialog->SetPopupOffset(psp_->GetPopupOffset() * bounds.h);

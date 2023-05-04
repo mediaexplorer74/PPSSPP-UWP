@@ -5,13 +5,8 @@
 #include <Windows.h>
 #include <direct.h>
 #if PPSSPP_PLATFORM(UWP)
-#if !defined(LEGACY_SUPPORT)
 #include <fileapifromapp.h>
-#endif
-#if !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
-#include "UWP/UWPHelpers/StorageManager.h"
-#include "UWP/UWPHelpers/PPSSPPTypesHelpers.h"
-#endif
+#include <UWP/UWPHelpers/StorageManager.h>
 #endif
 #else
 #include <strings.h>
@@ -33,7 +28,6 @@
 #include "Common/File/DirListing.h"
 #include "Common/File/FileUtil.h"
 #include "Common/File/AndroidStorage.h"
-#include "Common/Log.h"
 
 #if !defined(__linux__) && !defined(_WIN32) && !defined(__QNX__)
 #define stat64 stat
@@ -73,18 +67,9 @@ bool GetFileInfo(const Path &path, FileInfo * fileInfo) {
 #if PPSSPP_PLATFORM(WINDOWS)
 	WIN32_FILE_ATTRIBUTE_DATA attrs;
 #if PPSSPP_PLATFORM(UWP)
-#if !defined(LEGACY_SUPPORT)
 	if (!GetFileAttributesExFromAppW(path.ToWString().c_str(), GetFileExInfoStandard, &attrs)) {
 #else
-    if (!GetFileAttributesEx(path.ToWString().c_str(), GetFileExInfoStandard, &attrs)) {
-#endif
-#else
 	if (!GetFileAttributesExW(path.ToWString().c_str(), GetFileExInfoStandard, &attrs)) {
-#endif
-#if PPSSPP_PLATFORM(UWP) && !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
-		if (GetFileInfoUWP(path.ToString(), fileInfo)) {
-			return true;
-		}
 #endif
 		fileInfo->size = 0;
 		fileInfo->isDirectory = false;
@@ -231,25 +216,17 @@ bool GetFilesInDir(const Path &directory, std::vector<FileInfo> *files, const ch
 	// Find the first file in the directory.
 	WIN32_FIND_DATA ffd;
 #if PPSSPP_PLATFORM(UWP)
-#if !defined(LEGACY_SUPPORT)
 	HANDLE hFind = FindFirstFileExFromAppW((directory.ToWString() + L"\\*").c_str(), FindExInfoStandard, &ffd, FindExSearchNameMatch, NULL, 0);
-#else
-    HANDLE hFind = FindFirstFileEx((directory.ToWString() + L"\\*").c_str(), FindExInfoStandard, &ffd, FindExSearchNameMatch, NULL, 0);
-#endif
 #else
 	HANDLE hFind = FindFirstFileEx((directory.ToWString() + L"\\*").c_str(), FindExInfoStandard, &ffd, FindExSearchNameMatch, NULL, 0);
 #endif
-	VERBOSE_LOG(FILESYS, "Reading folder (%s)", directory.c_str());
-
 	if (hFind == INVALID_HANDLE_VALUE) {
-#if PPSSPP_PLATFORM(UWP) && !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
-		// Getting folder contents need extra work
-		// request must be done within StorageManager
-		auto contents = GetFolderContents(directory.ToString());
-		if (ItemsInfoUWPToFilesInfo(contents, files, filter, filters)) {
-			std::sort(files->begin(), files->end());
+#if PPSSPP_PLATFORM(UWP)
+		// This step just to avoid empty results by adding fake folders
+		// it will help also to navigate back between selected folder
+		// we must ignore this function for any request other than UI navigation
+		if (GetFakeFolders(directory, files, filter, filters))
 			return true;
-		}
 #endif
 		return false;
 	}

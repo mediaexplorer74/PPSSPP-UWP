@@ -741,10 +741,10 @@ protected:
 	std::string smallText_;
 	ImageID image_;  // Centered if no text, on the left if text.
 	ImageID rightIconImage_ = ImageID::invalid();  // Shows in the right.
-	float rightIconScale_;
-	float rightIconRot_;
-	bool rightIconFlipH_;
-	bool rightIconKeepColor_;
+	float rightIconScale_ = 0.0f;
+	float rightIconRot_ = 0.0f;
+	bool rightIconFlipH_ = false;
+	bool rightIconKeepColor_ = false;
 	Padding textPadding_;
 	bool centered_ = false;
 	float imgScale_ = 1.0f;
@@ -870,6 +870,8 @@ public:
 	BitCheckBox(uint32_t *bitfield, uint32_t bit, const std::string &text, const std::string &smallText = "", LayoutParams *layoutParams = nullptr)
 		: CheckBox(nullptr, text, smallText, layoutParams), bitfield_(bitfield), bit_(bit) {
 	}
+    
+	BitCheckBox(int *bitfield, int bit, const std::string &text, const std::string &smallText = "", LayoutParams *layoutParams = nullptr) : BitCheckBox((uint32_t *)bitfield, (uint32_t)bit, text, smallText, layoutParams) {}
 
 	void Toggle() override;
 	bool Toggled() const override;
@@ -932,6 +934,7 @@ public:
 	void SetFocusable(bool focusable) { focusable_ = focusable; }
 	void SetClip(bool clip) { clip_ = clip; }
 	void SetBullet(bool bullet) { bullet_ = bullet; }
+	void SetPadding(float pad) { pad_ = pad; }
 
 	bool CanBeFocused() const override { return focusable_; }
 
@@ -945,6 +948,7 @@ private:
 	bool focusable_;
 	bool clip_;
 	bool bullet_ = false;
+	float pad_ = 0.0f;
 };
 
 class TextEdit : public View {

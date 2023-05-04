@@ -48,7 +48,6 @@ public:
 protected:
 	void CreateViews() override;
 
-	void sendMessage(const char *message, const char *value) override;
 	void dialogFinished(const Screen *dialog, DialogResult result) override;
 	void update() override;
 	void render() override {
@@ -81,7 +80,7 @@ private:
 	bool storageBrowserWorking_;
 	bool done_ = false;
 
-#if PPSSPP_PLATFORM(UWP) && !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
+#if PPSSPP_PLATFORM(UWP) && !defined(__LIBRETRO__)
 	int choice_ = CHOICE_PRIVATE_DIRECTORY;
 #else
 	int choice_ = 0;
@@ -131,7 +130,7 @@ private:
 
 	Path newMemstickFolder_;
 	bool existingFilesInNewFolder_;
-#if PPSSPP_PLATFORM(UWP) && !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
+#if PPSSPP_PLATFORM(UWP) && !defined(__LIBRETRO__)
 	bool moveData_ = false;
 #else
 	bool moveData_ = true;

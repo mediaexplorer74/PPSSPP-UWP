@@ -19,6 +19,7 @@
 
 #include <functional>
 #include <memory>
+#include <set>
 #include <mutex>
 #include <vector>
 
@@ -56,8 +57,8 @@ private:
 
 class KeyMappingNewKeyDialog : public PopupScreen {
 public:
-	explicit KeyMappingNewKeyDialog(int btn, bool replace, std::function<void(KeyDef)> callback, std::shared_ptr<I18NCategory> i18n)
-		: PopupScreen(i18n->T("Map Key"), "Cancel", ""), pspBtn_(btn), callback_(callback) {}
+	explicit KeyMappingNewKeyDialog(int btn, bool replace, std::function<void(KeyMap::MultiInputMapping)> callback, I18NCat i18n)
+		: PopupScreen(T(i18n, "Map Key"), "Cancel", ""), pspBtn_(btn), callback_(callback) {}
 
 	const char *tag() const override { return "KeyMappingNewKey"; }
 
@@ -75,15 +76,20 @@ protected:
 
 private:
 	int pspBtn_;
-	std::function<void(KeyDef)> callback_;
-	bool mapped_ = false;  // Prevent double registrations
+	std::function<void(KeyMap::MultiInputMapping)> callback_;
+
+	KeyMap::MultiInputMapping mapping_;
+
+	// We need to do our own detection for axis "keyup" here.
+	std::set<InputMapping> triggeredAxes_;
+
 	double delayUntil_ = 0.0f;
 };
 
 class KeyMappingNewMouseKeyDialog : public PopupScreen {
 public:
-	KeyMappingNewMouseKeyDialog(int btn, bool replace, std::function<void(KeyDef)> callback, std::shared_ptr<I18NCategory> i18n)
-		: PopupScreen(i18n->T("Map Mouse"), "", ""), pspBtn_(btn), callback_(callback), mapped_(false) {}
+	KeyMappingNewMouseKeyDialog(int btn, bool replace, std::function<void(KeyMap::MultiInputMapping)> callback, I18NCat i18n)
+		: PopupScreen(T(i18n, "Map Mouse"), "", ""), pspBtn_(btn), callback_(callback) {}
 
 	const char *tag() const override { return "KeyMappingNewMouseKey"; }
 
@@ -99,8 +105,8 @@ protected:
 
 private:
 	int pspBtn_;
-	std::function<void(KeyDef)> callback_;
-	bool mapped_;  // Prevent double registrations
+	std::function<void(KeyMap::MultiInputMapping)> callback_;
+	bool mapped_ = false;  // Prevent double registrations
 };
 
 class JoystickHistoryView;
@@ -177,6 +183,9 @@ public:
 
 	const char *tag() const override { return "VisualMapping"; }
 
+	bool key(const KeyInput &key) override;
+	void axis(const AxisInput &axis) override;
+
 protected:
 	void CreateViews() override;
 
@@ -186,7 +195,7 @@ protected:
 private:
 	UI::EventReturn OnMapButton(UI::EventParams &e);
 	UI::EventReturn OnBindAll(UI::EventParams &e);
-	void HandleKeyMapping(KeyDef key);
+	void HandleKeyMapping(KeyMap::MultiInputMapping key);
 	void MapNext(bool successive);
 
 	MockPSP *psp_ = nullptr;

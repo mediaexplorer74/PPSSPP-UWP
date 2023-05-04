@@ -29,8 +29,6 @@
 
 extern const char *PPSSPP_GIT_VERSION;
 
-extern bool jitForcedOff;
-
 enum ChatPositions {
 	BOTTOM_LEFT = 0,
 	BOTTOM_CENTER = 1,
@@ -49,22 +47,6 @@ namespace http {
 
 struct UrlEncoder;
 struct ConfigPrivate;
-
-struct ConfigTouchPos {
-	float x;
-	float y;
-	float scale;
-	// Note: Show is not used for all settings.
-	bool show;
-};
-
-struct ConfigCustomButton {
-	uint64_t key;
-	int image;
-	int shape;
-	bool toggle;
-	bool repeat;
-};
 
 struct Config {
 public:
@@ -170,12 +152,13 @@ public:
 	bool bSkipBufferEffects;
 
 	int iTexFiltering; // 1 = auto , 2 = nearest , 3 = linear , 4 = auto max quality
-	int iBufFilter; // 1 = linear, 2 = nearest
 
 	bool bDisplayStretch;  // Automatically matches the aspect ratio of the window.
+	int iDisplayFilter;    // 1 = linear, 2 = nearest
 	float fDisplayOffsetX;
 	float fDisplayOffsetY;
 	float fDisplayScale;   // Relative to the most constraining axis (x or y).
+	bool bDisplayIntegerScale;  // Snaps scaling to integer scale factors in raw pixels.
 	float fDisplayAspectRatio;  // Stored relative to the PSP's native ratio, so 1.0 is the normal pixel aspect ratio.
 
 	bool bImmersiveMode;  // Mode on Android Kitkat 4.4 and later that hides the back button etc.
@@ -202,14 +185,7 @@ public:
 	float fUITint;
 	float fUISaturation;
 
-	bool bLegacyHandlerReady = false;
-	bool bSensorsMove;
-	bool bSensorsMoveX;
-	bool bSensorsMoveY;
-	bool bSensorsMoveZ;
 	bool bVertexCache;
-	bool bExecuteWriteResolver = false;
-	bool bFastLoop;
 	bool bTextureBackoffCache;
 	bool bVertexDecoderJit;
 	bool bFullScreen;
@@ -222,7 +198,6 @@ public:
 	bool bReplaceTextures;
 	bool bSaveNewTextures;
 	bool bIgnoreTextureFilenames;
-	bool bReplaceTexturesAllowLate;
 	int iTexScalingLevel; // 0 = auto, 1 = off, 2 = 2x, ..., 5 = 5x
 	int iTexScalingType; // 0 = xBRZ, 1 = Hybrid
 	bool bTexDeposterize;
@@ -230,10 +205,9 @@ public:
 	int iFpsLimit1;
 	int iFpsLimit2;
 	int iAnalogFpsLimit;
-	int iAnalogFpsMode; // 0 = auto, 1 = single direction, 2 = mapped to opposite
 	int iMaxRecent;
 	int iCurrentStateSlot;
-	int iRewindFlipFrequency;
+	int iRewindSnapshotInterval;
 	bool bUISound;
 	bool bEnableStateUndo;
 	std::string sStateLoadUndoGame;
@@ -277,7 +251,7 @@ public:
 
 	// UI
 	bool bShowDebuggerOnLoad;
-	int iShowFPSCounter;
+	int iShowStatusFlags;
 	bool bShowRegionOnGameIcon;
 	bool bShowIDOnGameIcon;
 	float fGameGridScale;
@@ -287,28 +261,26 @@ public:
 
 	std::string sThemeName;
 
+	// These aren't saved, just for instant debugging.
 	bool bLogFrameDrops;
 	bool bShowDebugStats;
 	bool bShowAudioDebug;
+	bool bShowControlDebug;
 	bool bShowGpuProfile;
 
-	//Analog stick tilting
-	//the base x and y tilt. this inclination is treated as (0,0) and the tilt input
-	//considers this orientation to be equal to no movement of the analog stick.
-	float fTiltBaseX, fTiltBaseY;
-	int iTiltOrientation;
-	//whether the x axes and y axes should invert directions (left becomes right, top becomes bottom.)
-	bool bInvertTiltX, bInvertTiltY;
-	//the sensitivity of the tilt in the x direction
+	// Analog stick tilting
+	// This is the held base angle (from the horizon), that we compute the tilt relative from.
+	float fTiltBaseAngleY;
+	// Inverts the direction of the x axes and y axes for the purposes of tilt input.
+	bool bInvertTiltX;
+	bool bInvertTiltY;
+	// The sensitivity of the tilt in the X and Y directions, separately.
 	int iTiltSensitivityX;
-	//the sensitivity of the tilt in the Y direction
 	int iTiltSensitivityY;
-	//the deadzone radius of the tilt
-	float fDeadzoneRadius;
-	// deadzone skip
-	float fTiltDeadzoneSkip;
-	//type of tilt input currently selected: Defined in TiltEventProcessor.h
-	//0 - no tilt, 1 - analog stick, 2 - D-Pad, 3 - Action Buttons (Tri, Cross, Square, Circle)
+	// The deadzone radius of the tilt. Only used in the analog mapping.
+	float fTiltAnalogDeadzoneRadius;
+	// Type of tilt input currently selected: Defined in TiltEventProcessor.h
+	// 0 - no tilt, 1 - analog stick, 2 - D-Pad, 3 - Action Buttons (Tri, Cross, Square, Circle)
 	int iTiltInputType;
 
 	// The three tabs.
@@ -342,8 +314,6 @@ public:
 	int iTouchButtonStyle;
 	int iTouchButtonOpacity;
 	int iTouchButtonHideSeconds;
-	// Auto rotation speed
-	float fAnalogAutoRotSpeed;
 
 	// Snap touch control position
 	bool bTouchSnapToGrid;
@@ -369,16 +339,16 @@ public:
 	ConfigTouchPos touchAnalogStick;
 	ConfigTouchPos touchRightAnalogStick;
 
-	ConfigTouchPos touchCombo0;
-	ConfigTouchPos touchCombo1;
-	ConfigTouchPos touchCombo2;
-	ConfigTouchPos touchCombo3;
-	ConfigTouchPos touchCombo4;
-	ConfigTouchPos touchCombo5;
-	ConfigTouchPos touchCombo6;
-	ConfigTouchPos touchCombo7;
-	ConfigTouchPos touchCombo8;
-	ConfigTouchPos touchCombo9;
+	ConfigTouchPos touchCustom0;
+	ConfigTouchPos touchCustom1;
+	ConfigTouchPos touchCustom2;
+	ConfigTouchPos touchCustom3;
+	ConfigTouchPos touchCustom4;
+	ConfigTouchPos touchCustom5;
+	ConfigTouchPos touchCustom6;
+	ConfigTouchPos touchCustom7;
+	ConfigTouchPos touchCustom8;
+	ConfigTouchPos touchCustom9;
 
 	float fLeftStickHeadScale;
 	float fRightStickHeadScale;
@@ -392,16 +362,16 @@ public:
 	bool bShowTouchTriangle;
 	bool bShowTouchSquare;
 
-	ConfigCustomButton CustomKey0;
-	ConfigCustomButton CustomKey1;
-	ConfigCustomButton CustomKey2;
-	ConfigCustomButton CustomKey3;
-	ConfigCustomButton CustomKey4;
-	ConfigCustomButton CustomKey5;
-	ConfigCustomButton CustomKey6;
-	ConfigCustomButton CustomKey7;
-	ConfigCustomButton CustomKey8;
-	ConfigCustomButton CustomKey9;	
+	ConfigCustomButton CustomButton0;
+	ConfigCustomButton CustomButton1;
+	ConfigCustomButton CustomButton2;
+	ConfigCustomButton CustomButton3;
+	ConfigCustomButton CustomButton4;
+	ConfigCustomButton CustomButton5;
+	ConfigCustomButton CustomButton6;
+	ConfigCustomButton CustomButton7;
+	ConfigCustomButton CustomButton8;
+	ConfigCustomButton CustomButton9;
 
 	// Ignored on iOS and other platforms that lack pause.
 	bool bShowTouchPause;
@@ -414,8 +384,10 @@ public:
 	float fAnalogSensitivity;
 	// convert analog stick circle to square
 	bool bAnalogIsCircular;
+	// Auto rotation speed
+	float fAnalogAutoRotSpeed;
 
-
+	// Sets up how much the analog limiter button restricts digital->analog input.
 	float fAnalogLimiterDeadzone;
 
 	bool bMouseControl;
@@ -475,6 +447,8 @@ public:
 	bool bEnableStereo;
 	bool bEnableMotions;
 	bool bForce72Hz;
+	bool bManualForceVR;
+	bool bRescaleHUD;
 	float fCameraDistance;
 	float fCameraHeight;
 	float fCameraSide;
@@ -482,6 +456,10 @@ public:
 	float fFieldOfViewPercentage;
 	float fHeadUpDisplayScale;
 	float fMotionLength;
+	float fHeadRotationScale;
+	bool bHeadRotationEnabled;
+	bool bHeadRotationSmoothing;
+	int iCameraPitch;
 
 	// Debugger
 	int iDisasmWindowX;
@@ -530,7 +508,7 @@ public:
 	void Load(const char *iniFileName = nullptr, const char *controllerIniFilename = nullptr);
 	bool Save(const char *saveReason);
 	void Reload();
-	void RestoreDefaults();
+	void RestoreDefaults(RestoreSettingsBits whatToRestore);
 
 	//per game config managment, should maybe be in it's own class
 	void changeGameSpecific(const std::string &gameId = "", const std::string &title = "");
@@ -576,7 +554,8 @@ public:
 	const std::map<std::string, std::pair<std::string, int>> &GetLangValuesMapping();
 	bool LoadAppendedConfig();
 	void SetAppendedConfigIni(const Path &path);
-
+	void UpdateAfterSettingAutoFrameSkip();
+	void NotifyUpdatedCpuCore();
 protected:
 	void LoadStandardControllerIni();
 	void LoadLangValuesMapping();

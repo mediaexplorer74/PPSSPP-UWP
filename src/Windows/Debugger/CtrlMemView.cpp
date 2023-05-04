@@ -1,10 +1,11 @@
-// NOTE: Apologies for the quality of this code, this is really from pre-opensource Dolphin - that is, 2003.
-
 #include <cctype>
 #include <tchar.h>
-#include <math.h>
+#include <cmath>
 #include <iomanip>
+#include <sstream>
+
 #include "ext/xxhash.h"
+#include "Common/StringUtils.h"
 #include "Core/Config.h"
 #include "Core/MemMap.h"
 #include "Core/Reporting.h"
@@ -34,7 +35,7 @@ CtrlMemView::CtrlMemView(HWND _wnd) {
 	SetWindowLong(wnd, GWL_STYLE, GetWindowLong(wnd,GWL_STYLE) | WS_VSCROLL);
 	SetScrollRange(wnd, SB_VERT, -1,1,TRUE);
 
-	const float fontScale = 1.0f / g_dpi_scale_real_y;
+	const float fontScale = 1.0f / g_display.dpi_scale_real_y;
 	charWidth_ = g_Config.iFontWidth * fontScale;
 	rowHeight_ = g_Config.iFontHeight * fontScale;
 	offsetPositionY_ = offsetLine * rowHeight_;
@@ -217,6 +218,8 @@ void CtrlMemView::onPaint(WPARAM wParam, LPARAM lParam) {
 		}
 	};
 
+	_assert_msg_(((windowStart_ | rowSize_) & 3) == 0, "readMemory() can't handle unaligned reads");
+
 	// draw one extra row that may be partially visible
 	for (int i = 0; i < visibleRows_ + 1; i++) {
 		int rowY = rowHeight_ * i;
@@ -226,7 +229,7 @@ void CtrlMemView::onPaint(WPARAM wParam, LPARAM lParam) {
 
 		char temp[32];
 		uint32_t address = windowStart_ + i * rowSize_;
-		sprintf(temp, "%08X", address);
+		snprintf(temp, sizeof(temp), "%08X", address);
 
 		setTextColors(0x600000, standardBG);
 		TextOutA(hdc, addressStartX_, rowY, temp, (int)strlen(temp));
@@ -235,8 +238,8 @@ void CtrlMemView::onPaint(WPARAM wParam, LPARAM lParam) {
 			uint32_t words[4];
 			uint8_t bytes[16];
 		} memory;
-		bool valid = debugger_ != nullptr && debugger_->isAlive() && Memory::IsValidAddress(address);
-		for (int i = 0; valid && i < 4; ++i) {
+		int valid = debugger_ != nullptr && debugger_->isAlive() ? Memory::ValidSize(address, 16) / 4 : 0;
+		for (int i = 0; i < valid; ++i) {
 			memory.words[i] = debugger_->readMemory(address + i * 4);
 		}
 
@@ -257,12 +260,12 @@ void CtrlMemView::onPaint(WPARAM wParam, LPARAM lParam) {
 
 			char c;
 			if (valid) {
-				sprintf(temp, "%02X ", memory.bytes[j]);
+				snprintf(temp, sizeof(temp), "%02X ", memory.bytes[j]);
 				c = (char)memory.bytes[j];
 				if (memory.bytes[j] < 32 || memory.bytes[j] >= 128)
 					c = '.';
 			} else {
-				strcpy(temp, "??");
+				truncate_cpy(temp, "??");
 				c = '.';
 			}
 
@@ -496,6 +499,7 @@ void CtrlMemView::onMouseUp(WPARAM wParam, LPARAM lParam, int button) {
 		HMENU menu = GetContextMenu(ContextMenuID::MEMVIEW);
 		EnableMenuItem(menu, ID_MEMVIEW_COPYVALUE_16, enable16 ? MF_ENABLED : MF_GRAYED);
 		EnableMenuItem(menu, ID_MEMVIEW_COPYVALUE_32, enable32 ? MF_ENABLED : MF_GRAYED);
+		EnableMenuItem(menu, ID_MEMVIEW_COPYFLOAT_32, enable32 ? MF_ENABLED : MF_GRAYED);
 
 		switch (TriggerContextMenu(ContextMenuID::MEMVIEW, wnd, ContextPoint::FromEvent(lParam))) {
 		case ID_MEMVIEW_DUMP:
@@ -577,6 +581,16 @@ void CtrlMemView::onMouseUp(WPARAM wParam, LPARAM lParam, int button) {
 			}
 			break;
 
+		case ID_MEMVIEW_COPYFLOAT_32:
+		{
+			auto memLock = Memory::Lock();
+			std::ostringstream stream;
+			stream << (Memory::IsValidAddress(curAddress_) ? Memory::Read_Float(curAddress_) : NAN);
+			auto temp_string = stream.str();
+			W32Util::CopyTextToClipboard(wnd, temp_string.c_str());
+		}
+		break;
+
 		case ID_MEMVIEW_EXTENTBEGIN:
 		{
 			std::vector<MemBlockInfo> memRangeInfo = FindMemInfoByFlag(highlightFlags_, curAddress_, 1);
@@ -602,7 +616,7 @@ void CtrlMemView::onMouseUp(WPARAM wParam, LPARAM lParam, int button) {
 		case ID_MEMVIEW_COPYADDRESS:
 			{
 				char temp[24];
-				sprintf(temp, "0x%08X", curAddress_);
+				snprintf(temp, sizeof(temp), "0x%08X", curAddress_);
 				W32Util::CopyTextToClipboard(wnd, temp);
 			}
 			break;
@@ -901,7 +915,7 @@ void CtrlMemView::search(bool continueSearch) {
 		segmentEnd = memoryAreas[i].second;
 
 		// better safe than sorry, I guess
-		if (Memory::IsValidAddress(segmentStart))
+		if (!Memory::IsValidAddress(segmentStart))
 			continue;
 		const u8 *dataPointer = Memory::GetPointerUnchecked(segmentStart);
 
@@ -945,7 +959,7 @@ void CtrlMemView::drawOffsetScale(HDC hdc) {
 	
 	char temp[64];
 	for (int i = 0; i < 16; i++) {
-		sprintf(temp, "%02X", i);
+		snprintf(temp, sizeof(temp), "%02X", i);
 		TextOutA(hdc, currentX, offsetPositionY_, temp, 2);
 		currentX += 3 * charWidth_; // hex and space
 	}

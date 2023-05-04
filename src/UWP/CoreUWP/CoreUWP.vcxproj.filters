@@ -96,7 +96,6 @@
     <ClCompile Include="..\..\Core\CwCheat.cpp" />
     <ClCompile Include="..\..\Core\HDRemaster.cpp" />
     <ClCompile Include="..\..\Core\Instance.cpp" />
-    <ClCompile Include="..\..\Core\Host.cpp" />
     <ClCompile Include="..\..\Core\Loaders.cpp" />
     <ClCompile Include="..\..\Core\MemFault.cpp" />
     <ClCompile Include="..\..\Core\MemMap.cpp" />
@@ -108,7 +107,6 @@
     <ClCompile Include="..\..\Core\SaveState.cpp" />
     <ClCompile Include="..\..\Core\Screenshot.cpp" />
     <ClCompile Include="..\..\Core\System.cpp" />
-    <ClCompile Include="..\..\Core\TextureReplacer.cpp" />
     <ClCompile Include="..\..\Core\WaveFile.cpp" />
     <ClCompile Include="..\..\Core\MIPS\ARM\ArmAsm.cpp">
       <Filter>MIPS\ARM</Filter>
@@ -1124,6 +1122,11 @@
     <ClCompile Include="..\..\Core\HLE\sceNp2.cpp">
       <Filter>HLE</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Core\TiltEventProcessor.cpp" />
+    <ClCompile Include="..\..\Core\MIPS\MIPSVFPUFallbacks.cpp">
+      <Filter>MIPS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Core\ConfigSettings.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -1136,7 +1139,6 @@
     <ClInclude Include="..\..\Core\CwCheat.h" />
     <ClInclude Include="..\..\Core\HDRemaster.h" />
     <ClInclude Include="..\..\Core\Instance.h" />
-    <ClInclude Include="..\..\Core\Host.h" />
     <ClInclude Include="..\..\Core\Loaders.h" />
     <ClInclude Include="..\..\Core\MemFault.h" />
     <ClInclude Include="..\..\Core\MemMap.h" />
@@ -1149,7 +1151,6 @@
     <ClInclude Include="..\..\Core\SaveState.h" />
     <ClInclude Include="..\..\Core\Screenshot.h" />
     <ClInclude Include="..\..\Core\System.h" />
-    <ClInclude Include="..\..\Core\TextureReplacer.h" />
     <ClInclude Include="..\..\Core\ThreadEventQueue.h" />
     <ClInclude Include="..\..\Core\WaveFile.h" />
     <ClInclude Include="..\..\Core\MIPS\ARM\ArmCompVFPUNEONUtil.h">
@@ -1776,6 +1777,11 @@
     <ClInclude Include="..\..\Core\HLE\sceNp2.h">
       <Filter>HLE</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Core\TiltEventProcessor.h" />
+    <ClInclude Include="..\..\Core\MIPS\MIPSVFPUFallbacks.h">
+      <Filter>MIPS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\ConfigSettings.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\ext\gason\LICENSE">

@@ -21,10 +21,10 @@
 
 #include "Common/Data/Text/I18n.h"
 #include "Common/File/FileUtil.h"
+#include "Common/System/System.h"
 #include "Common/Log.h"
 #include "Common/Swap.h"
 #include "Core/Loaders.h"
-#include "Core/Host.h"
 #include "Core/FileSystems/BlockDevices.h"
 
 extern "C"
@@ -71,9 +71,9 @@ u32 BlockDevice::CalculateCRC(volatile bool *cancel) {
 }
 
 void BlockDevice::NotifyReadError() {
-	auto err = GetI18NCategory("Error");
+	auto err = GetI18NCategory(I18NCat::ERRORS);
 	if (!reportedError_) {
-		host->NotifyUserMessage(err->T("Game disc read error - ISO corrupt"), 6.0f);
+		System_NotifyUserMessage(err->T("Game disc read error - ISO corrupt"), 6.0f);
 		reportedError_ = true;
 	}
 }

@@ -222,7 +222,8 @@ public:
 	// Simple workaround for the casting warning.
 	template <class T>
 	void SetDebugName(T handle, VkObjectType type, const char *name) {
-		if (extensionsLookup_.EXT_debug_utils) {
+		if (extensionsLookup_.EXT_debug_utils && handle != VK_NULL_HANDLE) {
+			_dbg_assert_(handle != VK_NULL_HANDLE);
 			SetDebugNameImpl((uint64_t)handle, type, name);
 		}
 	}
@@ -329,6 +330,7 @@ public:
 	}
 
 	int GetInflightFrames() const {
+		// out of MAX_INFLIGHT_FRAMES.
 		return inflightFrames_;
 	}
 	// Don't call while a frame is in progress.
@@ -371,6 +373,14 @@ public:
 
 	const std::vector<VkSurfaceFormatKHR> &SurfaceFormats() {
 		return surfFormats_;
+	}
+
+	VkPresentModeKHR GetPresentMode() const {
+		return presentMode_;
+	}
+
+	std::vector<VkPresentModeKHR> GetAvailablePresentModes() const {
+		return availablePresentModes_;
 	}
 
 private:
@@ -460,6 +470,9 @@ private:
 	VkSurfaceCapabilitiesKHR surfCapabilities_{};
 	std::vector<VkSurfaceFormatKHR> surfFormats_{};
 
+	VkPresentModeKHR presentMode_;
+	std::vector<VkPresentModeKHR> availablePresentModes_;
+
 	std::vector<VkCommandBuffer> cmdQueue_;
 
 	VmaAllocator allocator_ = VK_NULL_HANDLE;
@@ -485,6 +498,7 @@ bool GLSLtoSPV(const VkShaderStageFlagBits shader_type, const char *sourceCode, 
 
 const char *VulkanColorSpaceToString(VkColorSpaceKHR colorSpace);
 const char *VulkanFormatToString(VkFormat format);
+const char *VulkanPresentModeToString(VkPresentModeKHR presentMode);
 
 std::string FormatDriverVersion(const VkPhysicalDeviceProperties &props);
 

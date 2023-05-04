@@ -48,10 +48,6 @@
 #include "Core/Util/GameManager.h"
 #include "Common/Data/Text/I18n.h"
 
-#if PPSSPP_PLATFORM(UWP) && !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
-#include "UWP/UWPHelpers/StorageManager.h"
-#endif
-
 GameManager g_GameManager;
 
 static struct zip *ZipOpenPath(Path fileName) {
@@ -79,12 +75,6 @@ GameManager::GameManager() {
 
 Path GameManager::GetTempFilename() const {
 #ifdef _WIN32
-#if PPSSPP_PLATFORM(UWP) && !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
-	std::string tmpFile = GetTempFile("PSP.tmp");
-	if (!tmpFile.empty()) {
-		return Path(tmpFile);
-	}
-#endif
 	wchar_t tempPath[MAX_PATH];
 	GetTempPath(MAX_PATH, tempPath);
 	wchar_t buffer[MAX_PATH];
@@ -311,7 +301,7 @@ bool GameManager::InstallGame(Path url, Path fileName, bool deleteAfter) {
 		return InstallRawISO(fileName, shortFilename, deleteAfter);
 	}
 
-	auto sy = GetI18NCategory("System");
+	auto sy = GetI18NCategory(I18NCat::SYSTEM);
 	installInProgress_ = true;
 
 	Path pspGame = GetSysDirectory(DIRECTORY_GAME);
@@ -362,7 +352,7 @@ bool GameManager::InstallGame(Path url, Path fileName, bool deleteAfter) {
 }
 
 bool GameManager::DetectTexturePackDest(struct zip *z, int iniIndex, Path &dest) {
-	auto iz = GetI18NCategory("InstallZip");
+	auto iz = GetI18NCategory(I18NCat::INSTALLZIP);
 
 	struct zip_stat zstat;
 	zip_stat_index(z, iniIndex, 0, &zstat);
@@ -542,7 +532,7 @@ bool GameManager::InstallMemstickGame(struct zip *z, const Path &zipfile, const 
 	size_t allBytes = 0;
 	size_t bytesCopied = 0;
 
-	auto sy = GetI18NCategory("System");
+	auto sy = GetI18NCategory(I18NCat::SYSTEM);
 
 	auto fileAllowed = [&](const char *fn) {
 		if (!allowRoot && strchr(fn, '/') == 0)
@@ -640,7 +630,7 @@ bool GameManager::InstallMemstickZip(struct zip *z, const Path &zipfile, const P
 	size_t allBytes = 0;
 	size_t bytesCopied = 0;
 
-	auto sy = GetI18NCategory("System");
+	auto sy = GetI18NCategory(I18NCat::SYSTEM);
 
 	// We don't need the zip anymore, as we're going to copy it as-is.
 	zip_close(z);

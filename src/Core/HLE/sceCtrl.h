@@ -64,12 +64,8 @@ void __CtrlInit();
 void __CtrlDoState(PointerWrap &p);
 void __CtrlShutdown();
 
-// Call this whenever a button is pressed, using the above CTRL_ constants.
-// Multiple buttons may be sent in one call OR'd together.
-// Resending a currently pressed button is fine but not required.
-void __CtrlButtonDown(u32 buttonBit);
-// Call this whenever a button is released.  Similar to __CtrlButtonDown().
-void __CtrlButtonUp(u32 buttonBit);
+// Clears and sets selected buttons. NOTE: Clearing happens first.
+void __CtrlUpdateButtons(u32 bitsToSet, u32 bitsToClear);
 
 // Call this to set the position of an analog stick, ideally when it changes.
 // X and Y values should be from -1 to 1, inclusive, in a square (no need to force to a circle.)

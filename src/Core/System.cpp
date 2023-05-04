@@ -33,21 +33,22 @@
 #include <condition_variable>
 
 #include "Common/System/System.h"
+#include "Common/System/Request.h"
 #include "Common/File/Path.h"
+#include "Common/File/FileUtil.h"
+#include "Common/File/DirListing.h"
 #include "Common/Math/math_util.h"
 #include "Common/Thread/ThreadUtil.h"
 #include "Common/Data/Encoding/Utf8.h"
-
-#include "Common/File/FileUtil.h"
 #include "Common/TimeUtil.h"
 #include "Common/GraphicsContext.h"
+
 #include "Core/MemFault.h"
 #include "Core/HDRemaster.h"
 #include "Core/MIPS/MIPS.h"
 #include "Core/MIPS/MIPSAnalyst.h"
 #include "Core/MIPS/MIPSVFPUUtils.h"
 #include "Core/Debugger/SymbolMap.h"
-#include "Core/Host.h"
 #include "Core/System.h"
 #include "Core/HLE/HLE.h"
 #include "Core/HLE/Plugins.h"
@@ -124,8 +125,7 @@ void UpdateUIState(GlobalUIState newState) {
 	// Never leave the EXIT state.
 	if (globalUIState != newState && globalUIState != UISTATE_EXIT) {
 		globalUIState = newState;
-		if (host)
-			host->UpdateDisassembly();
+		System_Notify(SystemNotification::DISASSEMBLY);
 		const char *state = nullptr;
 		switch (globalUIState) {
 		case UISTATE_EXIT: state = "exit";  break;
@@ -135,7 +135,7 @@ void UpdateUIState(GlobalUIState newState) {
 		case UISTATE_EXCEPTION: state = "exception"; break;
 		}
 		if (state) {
-			System_SendMessage("uistate", state);
+			System_NotifyUIState(state);
 		}
 	}
 }
@@ -157,24 +157,6 @@ std::string GetGPUBackendDevice() {
 	return gpuBackendDevice;
 }
 
-bool IsAudioInitialised() {
-	return audioInitialized;
-}
-
-void Audio_Init() {
-	if (!audioInitialized) {
-		audioInitialized = true;
-		host->InitSound();
-	}
-}
-
-void Audio_Shutdown() {
-	if (audioInitialized) {
-		audioInitialized = false;
-		host->ShutdownSound();
-	}
-}
-
 bool CPU_IsReady() {
 	if (coreState == CORE_POWERUP)
 		return false;
@@ -190,6 +172,40 @@ bool CPU_HasPendingAction() {
 }
 
 void CPU_Shutdown();
+
+static Path SymbolMapFilename(const Path &currentFilename, const char *ext) {
+	File::FileInfo info{};
+	// can't fail, definitely exists if it gets this far
+	File::GetFileInfo(currentFilename, &info);
+	if (info.isDirectory) {
+		return currentFilename / (std::string(".ppsspp-symbols") + ext);
+	}
+	return currentFilename.WithReplacedExtension(ext);
+};
+
+static bool LoadSymbolsIfSupported() {
+	if (System_GetPropertyBool(SYSPROP_HAS_DEBUGGER)) {
+		if (!g_symbolMap)
+			return false;
+
+		bool result1 = g_symbolMap->LoadSymbolMap(SymbolMapFilename(PSP_CoreParameter().fileToStart, ".ppmap"));
+		// Load the old-style map file.
+		if (!result1)
+			result1 = g_symbolMap->LoadSymbolMap(SymbolMapFilename(PSP_CoreParameter().fileToStart, ".map"));
+		bool result2 = g_symbolMap->LoadNocashSym(SymbolMapFilename(PSP_CoreParameter().fileToStart, ".sym"));
+		return result1 || result2;
+	} else {
+		g_symbolMap->Clear();
+		return true;
+	}
+}
+
+static bool SaveSymbolMapIfSupported() {
+	if (g_symbolMap) {
+		return g_symbolMap->SaveSymbolMap(SymbolMapFilename(PSP_CoreParameter().fileToStart, ".ppmap"));
+	}
+	return false;
+}
 
 bool DiscIDFromGEDumpPath(const Path &path, FileLoader *fileLoader, std::string *id) {
 	using namespace GPURecord;
@@ -290,7 +306,7 @@ bool CPU_Init(std::string *errorString) {
 	// likely to collide with any commercial ones.
 	g_CoreParameter.compat.Load(g_paramSFO.GetDiscID());
 
-	InitVFPUSinCos();
+	InitVFPU();
 
 	if (allowPlugins)
 		HLEPlugins::Init();
@@ -301,11 +317,7 @@ bool CPU_Init(std::string *errorString) {
 	}
 	mipsr4k.Reset();
 
-	host->AttemptLoadSymbolMap();
-
-	if (g_CoreParameter.enableSound) {
-		Audio_Init();
-	}
+	LoadSymbolsIfSupported();
 
 	CoreTiming::Init();
 
@@ -346,7 +358,7 @@ void CPU_Shutdown() {
 	PSPLoaders_Shutdown();
 
 	if (g_Config.bAutoSaveSymbolMap) {
-		host->SaveSymbolMap();
+		SaveSymbolMapIfSupported();
 	}
 
 	Replacement_Shutdown();
@@ -354,9 +366,6 @@ void CPU_Shutdown() {
 	CoreTiming::Shutdown();
 	__KernelShutdown();
 	HLEShutdown();
-	if (g_CoreParameter.enableSound) {
-		Audio_Shutdown();
-	}
 
 	pspFileSystem.Shutdown();
 	mipsr4k.Shutdown();
@@ -547,7 +556,7 @@ void PSP_Shutdown() {
 	CPU_Shutdown();
 	GPU_Shutdown();
 	g_paramSFO.Clear();
-	host->SetWindowTitle(0);
+	System_SetWindowTitle("");
 	currentMIPS = 0;
 	pspIsInited = false;
 	pspIsIniting = false;
@@ -758,6 +767,7 @@ void InitSysDirectories() {
 	File::CreateDir(GetSysDirectory(DIRECTORY_SAVEDATA));
 	File::CreateDir(GetSysDirectory(DIRECTORY_SAVESTATE));
 	File::CreateDir(GetSysDirectory(DIRECTORY_SYSTEM));
+	File::CreateDir(GetSysDirectory(DIRECTORY_TEXTURES));
 
 	if (g_Config.currentDirectory.empty()) {
 		g_Config.currentDirectory = GetSysDirectory(DIRECTORY_GAME);

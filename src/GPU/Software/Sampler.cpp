@@ -109,12 +109,14 @@ FetchFunc GetFetchFunc(SamplerID id, BinManager *binner) {
 thread_local SamplerJitCache::LastCache SamplerJitCache::lastFetch_;
 thread_local SamplerJitCache::LastCache SamplerJitCache::lastNearest_;
 thread_local SamplerJitCache::LastCache SamplerJitCache::lastLinear_;
+int SamplerJitCache::clearGen_ = 0;
 
 // 256k should be enough.
 SamplerJitCache::SamplerJitCache() : Rasterizer::CodeBlock(1024 * 64 * 4), cache_(64) {
 	lastFetch_.gen = -1;
 	lastNearest_.gen = -1;
 	lastLinear_.gen = -1;
+	clearGen_++;
 }
 
 void SamplerJitCache::Clear() {
@@ -278,7 +280,7 @@ static inline int GetPixelDataOffset(uint32_t row_pitch_pixels, uint32_t u, uint
 	const int tiles_in_block_horizontal = 4;
 	const int tiles_in_block_vertical = 8;
 
-	int texels_per_tile = tile_size_bits / texel_size_bits;
+	constexpr int texels_per_tile = tile_size_bits / texel_size_bits;
 	int tile_u = u / texels_per_tile;
 	int tile_idx = (v % tiles_in_block_vertical) * (tiles_in_block_horizontal) +
 	// TODO: not sure if the *texel_size_bits/8 factor is correct

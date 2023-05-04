@@ -466,9 +466,8 @@ void SoftGPU::DeviceLost() {
 	}
 }
 
-void SoftGPU::DeviceRestore() {
-	if (PSP_CoreParameter().graphicsContext)
-		draw_ = (Draw::DrawContext *)PSP_CoreParameter().graphicsContext->GetDrawContext();
+void SoftGPU::DeviceRestore(Draw::DrawContext *draw) {
+	draw_ = draw;
 	if (presentation_)
 		presentation_->DeviceRestore(draw_);
 	PPGeSetDrawContext(draw_);
@@ -563,7 +562,7 @@ void SoftGPU::CopyToCurrentFboFromDisplayRam(int srcwidth, int srcheight) {
 	desc.tag = "SoftGPU";
 	bool hasImage = true;
 
-	OutputFlags outputFlags = g_Config.iBufFilter == SCALE_NEAREST ? OutputFlags::NEAREST : OutputFlags::LINEAR;
+	OutputFlags outputFlags = g_Config.iDisplayFilter == SCALE_NEAREST ? OutputFlags::NEAREST : OutputFlags::LINEAR;
 	bool hasPostShader = presentation_ && presentation_->HasPostShader();
 
 	if (PSP_CoreParameter().compat.flags().DarkStalkersPresentHack && displayFormat_ == GE_FORMAT_5551 && g_DarkStalkerStretch != DSStretch::Off) {
@@ -671,6 +670,9 @@ void SoftGPU::MarkDirty(uint32_t addr, uint32_t bytes, SoftGPUVRAMDirty value) {
 
 	uint32_t start = ((addr - PSP_GetVidMemBase()) & 0x001FFFFF) >> 10;
 	uint32_t end = start + ((bytes + 1023) >> 10);
+	if (end > sizeof(vramDirty_)) {
+		end = sizeof(vramDirty_);
+	}
 	if (value == SoftGPUVRAMDirty::CLEAR || value == (SoftGPUVRAMDirty::DIRTY | SoftGPUVRAMDirty::REALLY_DIRTY)) {
 		memset(vramDirty_ + start, (uint8_t)value, end - start);
 	} else {

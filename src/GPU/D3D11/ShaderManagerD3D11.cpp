@@ -91,7 +91,6 @@ static constexpr size_t CODE_BUFFER_SIZE = 32768;
 
 ShaderManagerD3D11::ShaderManagerD3D11(Draw::DrawContext *draw, ID3D11Device *device, ID3D11DeviceContext *context, D3D_FEATURE_LEVEL featureLevel)
 	: ShaderManagerCommon(draw), device_(device), context_(context), featureLevel_(featureLevel) {
-	
 	codeBuffer_ = new char[CODE_BUFFER_SIZE];
 	memset(&ub_base, 0, sizeof(ub_base));
 	memset(&ub_lights, 0, sizeof(ub_lights));

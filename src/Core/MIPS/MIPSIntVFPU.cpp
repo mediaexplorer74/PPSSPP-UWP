@@ -21,6 +21,7 @@
 #include <limits>
 #include <algorithm>
 
+#include "Common/Data/Convert/SmallDataConvert.h"
 #include "Common/Math/math_util.h"
 
 #include "Core/Compatibility.h"
@@ -201,7 +202,7 @@ namespace MIPSInt
 
 	void Int_SVQ(MIPSOpcode op)
 	{
-		int imm = (signed short)(op&0xFFFC);
+		int imm = SignExtend16ToS32(op & 0xFFFC);
 		int rs = _RS;
 		int vt = (((op >> 16) & 0x1f)) | ((op&1) << 5);
 
@@ -419,7 +420,7 @@ namespace MIPSInt
 
 	void Int_Viim(MIPSOpcode op) {
 		int vt = _VT;
-		s32 imm = (s16)(op&0xFFFF);
+		s32 imm = SignExtend16ToS32(op & 0xFFFF);
 		u16 uimm16 = (op&0xFFFF);
 		float f[1];
 		int type = (op >> 23) & 7;
@@ -629,18 +630,18 @@ namespace MIPSInt
 			// vsat0 changes -0.0 to +0.0, both retain NAN.
 			case 4: if (s[i] <= 0) d[i] = 0; else {if(s[i] > 1.0f) d[i] = 1.0f; else d[i] = s[i];} break;    // vsat0
 			case 5: if (s[i] < -1.0f) d[i] = -1.0f; else {if(s[i] > 1.0f) d[i] = 1.0f; else d[i] = s[i];} break;  // vsat1
-			case 16: d[i] = 1.0f / s[i]; break; //vrcp
+			case 16: { d[i] = vfpu_rcp(s[i]); } break; //vrcp
 			case 17: d[i] = USE_VFPU_SQRT ? vfpu_rsqrt(s[i]) : 1.0f / sqrtf(s[i]); break; //vrsq
 				
 			case 18: { d[i] = vfpu_sin(s[i]); } break; //vsin
 			case 19: { d[i] = vfpu_cos(s[i]); } break; //vcos
-			case 20: d[i] = powf(2.0f, s[i]); break; //vexp2
-			case 21: d[i] = logf(s[i])/log(2.0f); break; //vlog2
+			case 20: { d[i] = vfpu_exp2(s[i]); } break; //vexp2
+			case 21: { d[i] = vfpu_log2(s[i]); } break; //vlog2
 			case 22: d[i] = USE_VFPU_SQRT ? vfpu_sqrt(s[i])  : fabsf(sqrtf(s[i])); break; //vsqrt
-			case 23: d[i] = (float)(asinf(s[i]) / M_PI_2); break; //vasin
-			case 24: d[i] = -1.0f / s[i]; break; // vnrcp
+			case 23: { d[i] = vfpu_asin(s[i]); } break; //vasin
+			case 24: { d[i] = -vfpu_rcp(s[i]); } break; // vnrcp
 			case 26: { d[i] = -vfpu_sin(s[i]); } break; // vnsin
-			case 28: d[i] = 1.0f / powf(2.0, s[i]); break; // vrexp2
+			case 28: { d[i] = vfpu_rexp2(s[i]); } break; // vrexp2
 			default:
 				_dbg_assert_msg_( false, "Invalid VV2Op op type %d", optype);
 				break;
@@ -1736,7 +1737,7 @@ namespace MIPSInt
  
 	void Int_SV(MIPSOpcode op)
 	{
-		s32 imm = (signed short)(op&0xFFFC);
+		s32 imm = SignExtend16ToS32(op & 0xFFFC);
 		int vt = ((op >> 16) & 0x1f) | ((op & 3) << 5);
 		int rs = _RS;
 		u32 addr = R(rs) + imm;

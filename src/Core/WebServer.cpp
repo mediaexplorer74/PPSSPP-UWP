@@ -191,7 +191,7 @@ static void DiscHandler(const http::Request &request, const Path &filename) {
 
 		s64 len = last - begin + 1;
 		char contentRange[1024];
-		sprintf(contentRange, "Content-Range: bytes %lld-%lld/%lld\r\n", begin, last, sz);
+		snprintf(contentRange, sizeof(contentRange), "Content-Range: bytes %lld-%lld/%lld\r\n", begin, last, sz);
 		request.WriteHttpResponseHeader("1.0", 206, len, "application/octet-stream", contentRange);
 
 		const size_t CHUNK_SIZE = 16 * 1024;
@@ -237,7 +237,7 @@ static bool ServeDebuggerFile(const http::Request &request) {
 		return false;
 
 	size_t size;
-	uint8_t *data = VFSReadFile(filename, &size);
+	uint8_t *data = g_VFS.ReadFile(filename, &size);
 	if (!data)
 		return false;
 

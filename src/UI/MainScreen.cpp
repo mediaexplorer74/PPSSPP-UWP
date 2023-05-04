@@ -23,6 +23,8 @@
 
 #include "Common/System/Display.h"
 #include "Common/System/System.h"
+#include "Common/System/Request.h"
+#include "Common/System/NativeApp.h"
 #include "Common/Render/TextureAtlas.h"
 #include "Common/Render/DrawBuffer.h"
 #include "Common/UI/Root.h"
@@ -39,8 +41,8 @@
 #include "Common/TimeUtil.h"
 #include "Common/StringUtils.h"
 #include "Core/System.h"
-#include "Core/Host.h"
 #include "Core/Reporting.h"
+#include "Core/HLE/sceCtrl.h"
 #include "Core/ELF/PBPReader.h"
 #include "Core/ELF/ParamSFO.h"
 #include "Core/Util/GameManager.h"
@@ -61,6 +63,10 @@
 #include "Core/Loaders.h"
 #include "GPU/GPUInterface.h"
 #include "Common/Data/Text/I18n.h"
+
+#if PPSSPP_PLATFORM(IOS) || PPSSPP_PLATFORM(MAC)
+#include "UI/DarwinFileSystemServices.h" // For the browser
+#endif
 
 #include "Core/HLE/sceUmd.h"
 
@@ -152,7 +158,7 @@ public:
 		std::vector<int> pspKeys;
 		bool showInfo = false;
 
-		if (KeyMap::KeyToPspButton(key.deviceId, key.keyCode, &pspKeys)) {
+		if (KeyMap::InputMappingToPspButton(InputMapping(key.deviceId, key.keyCode), &pspKeys)) {
 			for (auto it = pspKeys.begin(), end = pspKeys.end(); it != end; ++it) {
 				// If the button mapped to triangle, then show the info.
 				if (HasFocus() && (key.flags & KEY_UP) && *it == CTRL_TRIANGLE) {
@@ -316,9 +322,9 @@ void GameButton::Draw(UIContext &dc) {
 
 	char discNumInfo[8];
 	if (ginfo->disc_total > 1)
-		sprintf(discNumInfo, "-DISC%d", ginfo->disc_number);
+		snprintf(discNumInfo, sizeof(discNumInfo), "-DISC%d", ginfo->disc_number);
 	else
-		strcpy(discNumInfo, "");
+		discNumInfo[0] = '\0';
 
 	dc.Draw()->Flush();
 	dc.RebindTexture();
@@ -423,7 +429,7 @@ void GameButton::Draw(UIContext &dc) {
 
 std::string GameButton::DescribeText() const {
 	std::shared_ptr<GameInfo> ginfo = g_gameInfoCache->GetInfo(nullptr, gamePath_, 0);
-	auto u = GetI18NCategory("UI Elements");
+	auto u = GetI18NCategory(I18NCat::UI_ELEMENTS);
 	return ReplaceAll(u->T("%1 button"), "%1", ginfo->GetTitle());
 }
 
@@ -529,12 +535,15 @@ UI::EventReturn GameBrowser::LayoutChange(UI::EventParams &e) {
 }
 
 UI::EventReturn GameBrowser::LastClick(UI::EventParams &e) {
-	LaunchBrowser(lastLink_.c_str());
+	System_LaunchUrl(LaunchUrlType::BROWSER_URL, lastLink_.c_str());
 	return UI::EVENT_DONE;
 }
 
 UI::EventReturn GameBrowser::BrowseClick(UI::EventParams &e) {
-	System_SendMessage("browse_folder", "");
+	auto mm = GetI18NCategory(I18NCat::MAINMENU);
+	System_BrowseForFolder(mm->T("Choose folder"), [this](const std::string &filename, int) {
+		this->SetPath(Path(filename));
+	});
 	return UI::EVENT_DONE;
 }
 
@@ -679,7 +688,7 @@ void GameBrowser::Refresh() {
 	Clear();
 
 	Add(new Spacer(1.0f));
-	auto mm = GetI18NCategory("MainMenu");
+	auto mm = GetI18NCategory(I18NCat::MAINMENU);
 
 	// No topbar on recent screen
 	if (DisplayTopBar()) {
@@ -691,9 +700,15 @@ void GameBrowser::Refresh() {
 			if (System_GetPropertyBool(SYSPROP_HAS_ADDITIONAL_STORAGE)) {
 				topBar->Add(new Choice(ImageID("I_SDCARD"), new LayoutParams(WRAP_CONTENT, 64.0f)))->OnClick.Handle(this, &GameBrowser::StorageClick);
 			}
+#if PPSSPP_PLATFORM(IOS) || PPSSPP_PLATFORM(MAC)
+			// on Darwin, we don't show the 'Browse' text alongside the image
+			// we show just the image, because we don't need to emphasize the button on Darwin
+			topBar->Add(new Choice(ImageID("I_FOLDER_OPEN"), new LayoutParams(WRAP_CONTENT, 64.0f)))->OnClick.Handle(this, &GameBrowser::BrowseClick);
+#else
 			if (System_GetPropertyBool(SYSPROP_HAS_FOLDER_BROWSER)) {
 				topBar->Add(new Choice(mm->T("Browse"), ImageID("I_FOLDER_OPEN"), new LayoutParams(WRAP_CONTENT, 64.0f)))->OnClick.Handle(this, &GameBrowser::BrowseClick);
 			}
+#endif
 		} else {
 			topBar->Add(new Spacer(new LinearLayoutParams(FILL_PARENT, 64.0f, 1.0f)));
 		}
@@ -942,7 +957,7 @@ UI::EventReturn GameBrowser::NavigateClick(UI::EventParams &e) {
 }
 
 UI::EventReturn GameBrowser::GridSettingsClick(UI::EventParams &e) {
-	auto sy = GetI18NCategory("System");
+	auto sy = GetI18NCategory(I18NCat::SYSTEM);
 	auto gridSettings = new GridSettingsScreen(sy->T("Games list settings"));
 	gridSettings->OnRecentChanged.Handle(this, &GameBrowser::OnRecentClear);
 	if (e.v)
@@ -954,9 +969,7 @@ UI::EventReturn GameBrowser::GridSettingsClick(UI::EventParams &e) {
 
 UI::EventReturn GameBrowser::OnRecentClear(UI::EventParams &e) {
 	screenManager_->RecreateAllViews();
-	if (host) {
-		host->UpdateUI();
-	}
+	System_Notify(SystemNotification::UI);
 	return UI::EVENT_DONE;
 }
 
@@ -966,7 +979,6 @@ UI::EventReturn GameBrowser::OnHomebrewStore(UI::EventParams &e) {
 }
 
 MainScreen::MainScreen() {
-	System_SendMessage("event", "mainscreen");
 	g_BackgroundAudio.SetGame(Path());
 }
 
@@ -982,7 +994,7 @@ void MainScreen::CreateViews() {
 
 	bool vertical = UseVerticalLayout();
 
-	auto mm = GetI18NCategory("MainMenu");
+	auto mm = GetI18NCategory(I18NCat::MAINMENU);
 
 	Margins actionMenuMargins(0, 10, 10, 0);
 
@@ -1024,10 +1036,10 @@ void MainScreen::CreateViews() {
 		scrollHomebrew->SetTag("MainScreenHomebrew");
 
 		GameBrowser *tabAllGames = new GameBrowser(Path(g_Config.currentDirectory), BrowseFlags::STANDARD, &g_Config.bGridView2, screenManager(),
-			mm->T("How to get games"), "https://www.ppsspp.org/getgames.html",
+			mm->T("How to get games"), "https://www.ppsspp.org/getgames",
 			new LinearLayoutParams(FILL_PARENT, FILL_PARENT));
 		GameBrowser *tabHomebrew = new GameBrowser(GetSysDirectory(DIRECTORY_GAME), BrowseFlags::HOMEBREW_STORE, &g_Config.bGridView3, screenManager(),
-			mm->T("How to get homebrew & demos", "How to get homebrew && demos"), "https://www.ppsspp.org/gethomebrew.html",
+			mm->T("How to get homebrew & demos", "How to get homebrew && demos"), "https://www.ppsspp.org/gethomebrew",
 			new LinearLayoutParams(FILL_PARENT, FILL_PARENT));
 
 		scrollAllGames_->Add(tabAllGames);
@@ -1108,7 +1120,7 @@ void MainScreen::CreateViews() {
 	rightColumn->Add(rightColumnItems);
 
 	char versionString[256];
-	sprintf(versionString, "%s", PPSSPP_GIT_VERSION);
+	snprintf(versionString, sizeof(versionString), "%s", PPSSPP_GIT_VERSION);
 	rightColumnItems->SetSpacing(0.0f);
 	AnchorLayout *logos = new AnchorLayout(new AnchorLayoutParams(FILL_PARENT, 60.0f, false));
 	if (System_GetPropertyBool(SYSPROP_APP_GOLD)) {
@@ -1119,7 +1131,7 @@ void MainScreen::CreateViews() {
 	logos->Add(new ImageView(ImageID("I_LOGO"), "PPSSPP", IS_DEFAULT, new AnchorLayoutParams(180, 64, 64, -5.0f, NONE, NONE, false)));
 
 #if !defined(MOBILE_DEVICE)
-	auto gr = GetI18NCategory("Graphics");
+	auto gr = GetI18NCategory(I18NCat::GRAPHICS);
 	ImageID icon(g_Config.UseFullScreen() ? "I_RESTORE" : "I_FULLSCREEN");
 	fullscreenButton_ = logos->Add(new Button(gr->T("FullScreen", "Full Screen"), icon, new AnchorLayoutParams(48, 48, NONE, 0, 0, NONE, false)));
 	fullscreenButton_->SetIgnoreText(true);
@@ -1155,11 +1167,8 @@ void MainScreen::CreateViews() {
 		}
 	}
 
-//#if !PPSSPP_PLATFORM(UWP)
-	// Having an exit button is against UWP guidelines.
 	rightColumnChoices->Add(new Spacer(25.0));
 	rightColumnChoices->Add(new Choice(mm->T("Exit")))->OnClick.Handle(this, &MainScreen::OnExit);
-//#endif
 
 	if (vertical) {
 		root_ = new LinearLayout(ORIENT_VERTICAL);
@@ -1180,7 +1189,7 @@ void MainScreen::CreateViews() {
 		root_->SetDefaultFocusView(tabHolder_);
 	}
 
-	auto u = GetI18NCategory("Upgrade");
+	auto u = GetI18NCategory(I18NCat::UPGRADE);
 
 	upgradeBar_ = 0;
 	if (!g_Config.upgradeMessage.empty()) {
@@ -1216,16 +1225,16 @@ UI::EventReturn MainScreen::OnDownloadUpgrade(UI::EventParams &e) {
 #if PPSSPP_PLATFORM(ANDROID)
 	// Go to app store
 	if (System_GetPropertyBool(SYSPROP_APP_GOLD)) {
-		LaunchBrowser("market://details?id=org.ppsspp.ppssppgold");
+		System_LaunchUrl(LaunchUrlType::BROWSER_URL, "market://details?id=org.ppsspp.ppssppgold");
 	} else {
-		LaunchBrowser("market://details?id=org.ppsspp.ppsspp");
+		System_LaunchUrl(LaunchUrlType::BROWSER_URL, "market://details?id=org.ppsspp.ppsspp");
 	}
 #elif PPSSPP_PLATFORM(WINDOWS)
-	LaunchBrowser("https://www.ppsspp.org/downloads.html");
+	System_LaunchUrl(LaunchUrlType::BROWSER_URL, "https://www.ppsspp.org/download");
 #else
 	// Go directly to ppsspp.org and let the user sort it out
 	// (for details and in case downloads doesn't have their platform.)
-	LaunchBrowser("https://www.ppsspp.org/");
+	System_LaunchUrl(LaunchUrlType::BROWSER_URL, "https://www.ppsspp.org/");
 #endif
 	return UI::EVENT_DONE;
 }
@@ -1250,12 +1259,10 @@ void MainScreen::sendMessage(const char *message, const char *value) {
 		}
 		if (!strcmp(message, "browse_folderSelect")) {
 			std::string filename = value;
-			INFO_LOG(SYSTEM, "Got folder: '%s'", filename.c_str());
-			int tab = tabHolder_->GetCurrentTab();
-			// Don't allow browsing in the other tabs (I don't think it's possible to reach the option though)
-			if (tab == 1) {
-				gameBrowsers_[tab]->SetPath(Path(filename));
-			}
+			INFO_LOG(SYSTEM, "Got folder: '%s'", filename.c_str());;
+			// switch to the 'Games' tab which has the file browser
+			tabHolder_->SetCurrentTab(1);
+			gameBrowsers_[1]->SetPath(Path(filename));
 		}
 	}
 	if (!strcmp(message, "permission_granted") && !strcmp(value, "storage")) {
@@ -1270,7 +1277,10 @@ void MainScreen::update() {
 
 UI::EventReturn MainScreen::OnLoadFile(UI::EventParams &e) {
 	if (System_GetPropertyBool(SYSPROP_HAS_FILE_BROWSER)) {
-		System_SendMessage("browse_file", "");
+		auto mm = GetI18NCategory(I18NCat::MAINMENU);
+		System_BrowseForFile(mm->T("Load"), BrowseFileType::BOOTABLE, [](const std::string &value, int) {
+			NativeMessageReceived("boot", value.c_str());
+		});
 	}
 	return UI::EVENT_DONE;
 }
@@ -1283,7 +1293,7 @@ UI::EventReturn MainScreen::OnFullScreenToggle(UI::EventParams &e) {
 	}
 #if !defined(MOBILE_DEVICE)
 	g_Config.bFullScreen = !g_Config.bFullScreen;
-	System_SendMessage("toggle_fullscreen", "");
+	System_ToggleFullscreenState("");
 #endif
 	return UI::EVENT_DONE;
 }
@@ -1404,31 +1414,31 @@ UI::EventReturn MainScreen::OnCredits(UI::EventParams &e) {
 
 UI::EventReturn MainScreen::OnSupport(UI::EventParams &e) {
 #ifdef __ANDROID__
-	LaunchBrowser("market://details?id=org.ppsspp.ppssppgold");
+	System_LaunchUrl(LaunchUrlType::BROWSER_URL, "market://details?id=org.ppsspp.ppssppgold");
 #else
-	LaunchBrowser("https://central.ppsspp.org/buygold");
+	System_LaunchUrl(LaunchUrlType::BROWSER_URL, "https://www.ppsspp.org/buygold");
 #endif
 	return UI::EVENT_DONE;
 }
 
 UI::EventReturn MainScreen::OnPPSSPPOrg(UI::EventParams &e) {
-	LaunchBrowser("https://www.ppsspp.org");
+	System_LaunchUrl(LaunchUrlType::BROWSER_URL, "https://www.ppsspp.org");
 	return UI::EVENT_DONE;
 }
 
 UI::EventReturn MainScreen::OnForums(UI::EventParams &e) {
-	LaunchBrowser("https://forums.ppsspp.org");
+	System_LaunchUrl(LaunchUrlType::BROWSER_URL, "https://forums.ppsspp.org");
 	return UI::EVENT_DONE;
 }
 
 UI::EventReturn MainScreen::OnExit(UI::EventParams &e) {
 	// Let's make sure the config was saved, since it may not have been.
 	if (!g_Config.Save("MainScreen::OnExit")) {
-		System_SendMessage("toast", "Failed to save settings!\nCheck permissions, or try to restart the device.");
+		System_Toast("Failed to save settings!\nCheck permissions, or try to restart the device.");
 	}
 
 	// Request the framework to exit cleanly.
-	System_SendMessage("finish", "");
+	System_ExitApp();
 
 	UpdateUIState(UISTATE_EXIT);
 	return UI::EVENT_DONE;
@@ -1464,8 +1474,8 @@ void MainScreen::dialogFinished(const Screen *dialog, DialogResult result) {
 void UmdReplaceScreen::CreateViews() {
 	using namespace UI;
 	Margins actionMenuMargins(0, 100, 15, 0);
-	auto mm = GetI18NCategory("MainMenu");
-	auto di = GetI18NCategory("Dialog");
+	auto mm = GetI18NCategory(I18NCat::MAINMENU);
+	auto di = GetI18NCategory(I18NCat::DIALOG);
 
 	TabHolder *leftColumn = new TabHolder(ORIENT_HORIZONTAL, 64, new LinearLayoutParams(FILL_PARENT, WRAP_CONTENT, 1.0));
 	leftColumn->SetTag("UmdReplace");
@@ -1541,8 +1551,8 @@ UI::EventReturn UmdReplaceScreen::OnGameSelectedInstant(UI::EventParams &e) {
 void GridSettingsScreen::CreatePopupContents(UI::ViewGroup *parent) {
 	using namespace UI;
 
-	auto di = GetI18NCategory("Dialog");
-	auto sy = GetI18NCategory("System");
+	auto di = GetI18NCategory(I18NCat::DIALOG);
+	auto sy = GetI18NCategory(I18NCat::SYSTEM);
 
 	ScrollView *scroll = new ScrollView(ORIENT_VERTICAL, new LinearLayoutParams(FILL_PARENT, WRAP_CONTENT, 1.0f));
 	LinearLayout *items = new LinearLayoutList(ORIENT_VERTICAL);

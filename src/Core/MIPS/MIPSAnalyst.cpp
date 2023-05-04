@@ -676,7 +676,6 @@ namespace MIPSAnalyst {
 			return memcmp(rd, Memory::GetPointerRange(addr, 16), sizeof(float) * 4) != 0;
 		}
 
-		// TODO: Technically, the break might be for 1 byte in the middle of a sw.
 		return writeVal != prevVal;
 	}
 
@@ -931,7 +930,7 @@ skip:
 	}
 
 	static const char *DefaultFunctionName(char buffer[256], u32 startAddr) {
-		sprintf(buffer, "z_un_%08x", startAddr);
+		snprintf(buffer, 256, "z_un_%08x", startAddr);
 		return buffer;
 	}
 
@@ -1449,7 +1448,7 @@ skip:
 		case 0x08:	// addi
 		case 0x09:	// addiu
 			info.hasRelevantAddress = true;
-			info.relevantAddress = cpu->GetRegValue(0,MIPS_GET_RS(op))+((s16)(op & 0xFFFF));
+			info.relevantAddress = cpu->GetRegValue(0, MIPS_GET_RS(op)) + SignExtend16ToS32(op & 0xFFFF);
 			break;
 		}
 

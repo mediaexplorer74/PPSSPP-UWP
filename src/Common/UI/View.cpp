@@ -13,14 +13,12 @@
 #include "Common/UI/Tween.h"
 #include "Common/UI/Root.h"
 #include "Common/GPU/thin3d.h"
+#include "Common/System/Request.h"
 #include "Common/System/System.h"
 #include "Common/TimeUtil.h"
 #include "Common/StringUtils.h"
 #include "Common/Log.h"
 
-#if PPSSPP_PLATFORM(UWP) && !defined(NO_UI_HELPER) && !defined(__LIBRETRO__)
-#include "UWP/UWPHelpers/UIHelpers.h"
-#endif
 namespace UI {
 
 static constexpr Size ITEM_HEIGHT = 64.f;
@@ -265,11 +263,11 @@ bool Clickable::Touch(const TouchInput &input) {
 	return contains;
 }
 
-static bool MatchesKeyDef(const std::vector<KeyDef> &defs, const KeyInput &key) {
+static bool MatchesKeyDef(const std::vector<InputMapping> &defs, const KeyInput &key) {
 	// In addition to the actual search, we need to do another search where we replace the device ID with "ANY".
 	return
-		std::find(defs.begin(), defs.end(), KeyDef(key.deviceId, key.keyCode)) != defs.end() ||
-		std::find(defs.begin(), defs.end(), KeyDef(DEVICE_ID_ANY, key.keyCode)) != defs.end();
+		std::find(defs.begin(), defs.end(), InputMapping(key.deviceId, key.keyCode)) != defs.end() ||
+		std::find(defs.begin(), defs.end(), InputMapping(DEVICE_ID_ANY, key.keyCode)) != defs.end();
 }
 
 // TODO: O/X confirm preference for xperia play?
@@ -532,7 +530,7 @@ void Choice::Draw(UIContext &dc) {
 }
 
 std::string Choice::DescribeText() const {
-	auto u = GetI18NCategory("UI Elements");
+	auto u = GetI18NCategory(I18NCat::UI_ELEMENTS);
 	return ReplaceAll(u->T("%1 choice"), "%1", text_);
 }
 
@@ -553,7 +551,6 @@ void InfoItem::Draw(UIContext &dc) {
 	if (choiceStyle_) {
 		style = HasFocus() ? dc.theme->itemFocusedStyle : dc.theme->itemStyle;
 	}
-
 
 	if (style.background.type == DRAW_SOLID_COLOR) {
 		// For a smoother fade, using the same color with 0 alpha.
@@ -581,7 +578,7 @@ void InfoItem::Draw(UIContext &dc) {
 }
 
 std::string InfoItem::DescribeText() const {
-	auto u = GetI18NCategory("UI Elements");
+	auto u = GetI18NCategory(I18NCat::UI_ELEMENTS);
 	return ReplaceAll(ReplaceAll(u->T("%1: %2"), "%1", text_), "%2", rightText_);
 }
 
@@ -611,7 +608,7 @@ void ItemHeader::GetContentDimensionsBySpec(const UIContext &dc, MeasureSpec hor
 }
 
 std::string ItemHeader::DescribeText() const {
-	auto u = GetI18NCategory("UI Elements");
+	auto u = GetI18NCategory(I18NCat::UI_ELEMENTS);
 	return ReplaceAll(u->T("%1 heading"), "%1", text_);
 }
 
@@ -676,7 +673,7 @@ void PopupHeader::Draw(UIContext &dc) {
 }
 
 std::string PopupHeader::DescribeText() const {
-	auto u = GetI18NCategory("UI Elements");
+	auto u = GetI18NCategory(I18NCat::UI_ELEMENTS);
 	return ReplaceAll(u->T("%1 heading"), "%1", text_);
 }
 
@@ -757,7 +754,7 @@ void CheckBox::Draw(UIContext &dc) {
 }
 
 std::string CheckBox::DescribeText() const {
-	auto u = GetI18NCategory("UI Elements");
+	auto u = GetI18NCategory(I18NCat::UI_ELEMENTS);
 	std::string text = ReplaceAll(u->T("%1 checkbox"), "%1", text_);
 	if (!smallText_.empty()) {
 		text += "\n" + smallText_;
@@ -860,7 +857,7 @@ void Button::GetContentDimensions(const UIContext &dc, float &w, float &h) const
 }
 
 std::string Button::DescribeText() const {
-	auto u = GetI18NCategory("UI Elements");
+	auto u = GetI18NCategory(I18NCat::UI_ELEMENTS);
 	return ReplaceAll(u->T("%1 button"), "%1", GetText());
 }
 
@@ -922,7 +919,7 @@ void RadioButton::GetContentDimensions(const UIContext &dc, float &w, float &h) 
 }
 
 std::string RadioButton::DescribeText() const {
-	auto u = GetI18NCategory("UI Elements");
+	auto u = GetI18NCategory(I18NCat::UI_ELEMENTS);
 	return ReplaceAll(u->T("%1 radio button"), "%1", text_);
 }
 
@@ -1001,7 +998,8 @@ void TextView::GetContentDimensionsBySpec(const UIContext &dc, MeasureSpec horiz
 		bounds.w -= bulletOffset;
 	}
 	dc.MeasureTextRect(small_ ? dc.theme->uiFontSmall : dc.theme->uiFont, 1.0f, 1.0f, text_.c_str(), (int)text_.length(), bounds, &w, &h, textAlign_);
-
+	w += pad_ * 2.0f;
+	h += pad_ * 2.0f;
 	if (bullet_) {
 		w += bulletOffset;
 	}
@@ -1047,9 +1045,9 @@ void TextView::Draw(UIContext &dc) {
 
 	if (shadow_) {
 		uint32_t shadowColor = 0x80000000;
-		dc.DrawTextRect(text_.c_str(), textBounds.Offset(1.0f, 1.0f), shadowColor, textAlign_);
+		dc.DrawTextRect(text_.c_str(), textBounds.Offset(1.0f + pad_, 1.0f + pad_), shadowColor, textAlign_);
 	}
-	dc.DrawTextRect(text_.c_str(), textBounds, textColor, textAlign_);
+	dc.DrawTextRect(text_.c_str(), textBounds.Offset(pad_, pad_), textColor, textAlign_);
 	if (small_) {
 		// If we changed font style, reset it.
 		dc.SetFontStyle(dc.theme->uiFont);
@@ -1109,7 +1107,7 @@ void TextEdit::GetContentDimensions(const UIContext &dc, float &w, float &h) con
 }
 
 std::string TextEdit::DescribeText() const {
-	auto u = GetI18NCategory("UI Elements");
+	auto u = GetI18NCategory(I18NCat::UI_ELEMENTS);
 	return ReplaceAll(u->T("%1 text field"), "%1", GetText());
 }
 
@@ -1130,11 +1128,6 @@ bool TextEdit::Touch(const TouchInput &touch) {
 	if (touch.flags & TOUCH_DOWN) {
 		if (bounds_.Contains(touch.x, touch.y)) {
 			SetFocusedView(this, true);
-#if PPSSPP_PLATFORM(UWP) && !defined(NO_UI_HELPER) && !defined(__LIBRETRO__)
-			// Set target textEdit and invoke onscreen keyboard if possible
-			globalTextEdit = this;
-			ShowInputKeyboard();
-#endif
 			return true;
 		}
 	}
@@ -1203,7 +1196,7 @@ bool TextEdit::Key(const KeyInput &input) {
 			switch (input.keyCode) {
 			case NKCODE_C:
 				// Just copy the entire text contents, until we get selection support.
-				System_SendMessage("setclipboardtext", text_.c_str());
+				System_CopyStringToClipboard(text_.c_str());
 				break;
 			case NKCODE_V:
 				{
@@ -1257,27 +1250,16 @@ bool TextEdit::Key(const KeyInput &input) {
 	// Process chars.
 	if (input.flags & KEY_CHAR) {
 		int unichar = input.keyCode;
-#if PPSSPP_PLATFORM(UWP) && !defined(NO_UI_HELPER) && !defined(__LIBRETRO__)
-		// Char will be passed as is without conversion
-		if (input.keyChar !=nullptr) {
-			InsertAtCaret(input.keyChar);
-			textChanged = true;
-		}
-		else {
-#endif
-			if (unichar >= 0x20 && !ctrlDown_) {  // Ignore control characters.
-				// Insert it! (todo: do it with a string insert)
-				char buf[8];
-				buf[u8_wc_toutf8(buf, unichar)] = '\0';
-				if (strlen(buf) + text_.size() < maxLen_) {
-					undo_ = text_;
-					InsertAtCaret(buf);
-					textChanged = true;
-				}
+		if (unichar >= 0x20 && !ctrlDown_) {  // Ignore control characters.
+			// Insert it! (todo: do it with a string insert)
+			char buf[8];
+			buf[u8_wc_toutf8(buf, unichar)] = '\0';
+			if (strlen(buf) + text_.size() < maxLen_) {
+				undo_ = text_;
+				InsertAtCaret(buf);
+				textChanged = true;
 			}
-#if PPSSPP_PLATFORM(UWP) && !defined(NO_UI_HELPER) && !defined(__LIBRETRO__)
 		}
-#endif
 	}
 
 	if (textChanged) {
@@ -1302,14 +1284,14 @@ void ProgressBar::GetContentDimensions(const UIContext &dc, float &w, float &h) 
 
 void ProgressBar::Draw(UIContext &dc) {
 	char temp[32];
-	sprintf(temp, "%i%%", (int)(progress_ * 100.0f));
+	snprintf(temp, sizeof(temp), "%d%%", (int)(progress_ * 100.0f));
 	dc.Draw()->DrawImageCenterTexel(dc.theme->whiteImage, bounds_.x, bounds_.y, bounds_.x + bounds_.w * progress_, bounds_.y2(), 0xc0c0c0c0);
 	dc.SetFontStyle(dc.theme->uiFont);
 	dc.DrawTextRect(temp, bounds_, 0xFFFFFFFF, ALIGN_CENTER);
 }
 
 std::string ProgressBar::DescribeText() const {
-	auto u = GetI18NCategory("UI Elements");
+	auto u = GetI18NCategory(I18NCat::UI_ELEMENTS);
 	float percent = progress_ * 100.0f;
 	return ReplaceAll(u->T("Progress: %1%"), "%1", StringFromInt((int)percent));
 }
@@ -1461,17 +1443,17 @@ void Slider::Draw(UIContext &dc) {
 	dc.Draw()->DrawImage(dc.theme->sliderKnob, knobX, bounds_.centerY(), 1.0f, knobStyle.fgColor, ALIGN_CENTER);
 	char temp[64];
 	if (showPercent_)
-		sprintf(temp, "%i%%", *value_);
+		snprintf(temp, sizeof(temp), "%d%%", *value_);
 	else
-		sprintf(temp, "%i", *value_);
+		snprintf(temp, sizeof(temp), "%d", *value_);
 	dc.SetFontStyle(dc.theme->uiFont);
 	dc.DrawText(temp, bounds_.x2() - 22, bounds_.centerY(), dc.theme->popupStyle.fgColor, ALIGN_CENTER | FLAG_DYNAMIC_ASCII);
 }
 
 std::string Slider::DescribeText() const {
 	if (showPercent_)
-		return StringFromFormat("%i%% / %i%%", *value_, maxValue_);
-	return StringFromFormat("%i / %i", *value_, maxValue_);
+		return StringFromFormat("%d%% / %d%%", *value_, maxValue_);
+	return StringFromFormat("%d / %d", *value_, maxValue_);
 }
 
 void Slider::Update() {
@@ -1585,7 +1567,7 @@ void SliderFloat::Draw(UIContext &dc) {
 	dc.FillRect(Drawable(0xFF808080), Bounds(knobX, bounds_.centerY() - 2, (bounds_.x + bounds_.w - paddingRight_ - knobX), 4));
 	dc.Draw()->DrawImage(dc.theme->sliderKnob, knobX, bounds_.centerY(), 1.0f, knobStyle.fgColor, ALIGN_CENTER);
 	char temp[64];
-	sprintf(temp, "%0.2f", *value_);
+	snprintf(temp, sizeof(temp), "%0.2f", *value_);
 	dc.SetFontStyle(dc.theme->uiFont);
 	dc.DrawText(temp, bounds_.x2() - 22, bounds_.centerY(), dc.theme->popupStyle.fgColor, ALIGN_CENTER);
 }

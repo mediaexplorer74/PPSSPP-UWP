@@ -33,6 +33,7 @@
 #include "Common/Serialize/Serializer.h"
 #include "Common/Serialize/SerializeFuncs.h"
 #include "Common/StringUtils.h"
+#include "Common/System/System.h"
 #include "Common/File/FileUtil.h"
 #include "Common/File/DiskFree.h"
 #include "Common/File/VFS/VFS.h"
@@ -43,7 +44,6 @@
 #include "Core/HW/MemoryStick.h"
 #include "Core/CoreTiming.h"
 #include "Core/System.h"
-#include "Core/Host.h"
 #include "Core/Replay.h"
 #include "Core/Reporting.h"
 
@@ -51,13 +51,7 @@
 #include "Common/CommonWindows.h"
 #include <sys/stat.h>
 #if PPSSPP_PLATFORM(UWP)
-#if !defined(LEGACY_SUPPORT)
 #include <fileapifromapp.h>
-#endif
-#if !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
-#include "UWP/UWPHelpers/StorageManager.h"
-#include "UWP/UWPHelpers/PPSSPPTypesHelpers.h"
-#endif
 #endif
 #undef FILE_OPEN
 #else
@@ -172,22 +166,11 @@ bool DirectoryFileHandle::Open(const Path &basePath, std::string &fileName, File
 
 	// Let's do it!
 #if PPSSPP_PLATFORM(UWP)
-#if !defined(LEGACY_SUPPORT)
 	hFile = CreateFile2FromAppW(fullName.ToWString().c_str(), desired, sharemode, openmode, nullptr);
-#else
-    hFile = CreateFile2(fullName.ToWString().c_str(), desired, sharemode, openmode, nullptr);
-#endif
 #else
 	hFile = CreateFile(fullName.ToWString().c_str(), desired, sharemode, 0, openmode, 0, 0);
 #endif
 	bool success = hFile != INVALID_HANDLE_VALUE;
-#if PPSSPP_PLATFORM(UWP) && !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
-	if (!success) {
-		//Use UWP StorageManager to get handle
-		hFile = CreateFileUWP(fullName.ToString(), desired, sharemode, openmode);
-		success = hFile != INVALID_HANDLE_VALUE;
-	}
-#endif
 	if (!success) {
 		DWORD w32err = GetLastError();
 
@@ -195,30 +178,20 @@ bool DirectoryFileHandle::Open(const Path &basePath, std::string &fileName, File
 			// Sometimes, the file is locked for write, let's try again.
 			sharemode |= FILE_SHARE_WRITE;
 #if PPSSPP_PLATFORM(UWP)
-#if !defined(LEGACY_SUPPORT)
 			hFile = CreateFile2FromAppW(fullName.ToWString().c_str(), desired, sharemode, openmode, nullptr);
-#else
-            hFile = CreateFile2(fullName.ToWString().c_str(), desired, sharemode, openmode, nullptr);
-#endif
 #else
 			hFile = CreateFile(fullName.ToWString().c_str(), desired, sharemode, 0, openmode, 0, 0);
 #endif
 			success = hFile != INVALID_HANDLE_VALUE;
+			if (!success) {
+				w32err = GetLastError();
+			}
 		}
-#if PPSSPP_PLATFORM(UWP) && !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
-		if (!success) {
-			//Use UWP StorageManager to get handle
-			hFile = CreateFileUWP(fullName.ToString(), desired, sharemode, openmode);
-			success = hFile != INVALID_HANDLE_VALUE;
-		}
-#endif
-        if (!success) {
-		     w32err = GetLastError();
-		}
+
 		if (w32err == ERROR_DISK_FULL || w32err == ERROR_NOT_ENOUGH_QUOTA) {
 			// This is returned when the disk is full.
-			auto err = GetI18NCategory("Error");
-			host->NotifyUserMessage(err->T("Disk full while writing data"));
+			auto err = GetI18NCategory(I18NCat::ERRORS);
+			System_NotifyUserMessage(err->T("Disk full while writing data"));
 			error = SCE_KERNEL_ERROR_ERRNO_NO_PERM;
 		} else if (!success) {
 			error = SCE_KERNEL_ERROR_ERRNO_FILE_NOT_FOUND;
@@ -315,8 +288,8 @@ bool DirectoryFileHandle::Open(const Path &basePath, std::string &fileName, File
 		}
 	} else if (errno == ENOSPC) {
 		// This is returned when the disk is full.
-		auto err = GetI18NCategory("Error");
-		host->NotifyUserMessage(err->T("Disk full while writing data"));
+		auto err = GetI18NCategory(I18NCat::ERRORS);
+		System_NotifyUserMessage(err->T("Disk full while writing data"));
 		error = SCE_KERNEL_ERROR_ERRNO_NO_PERM;
 	} else {
 		error = SCE_KERNEL_ERROR_ERRNO_FILE_NOT_FOUND;
@@ -390,8 +363,8 @@ size_t DirectoryFileHandle::Write(const u8* pointer, s64 size)
 
 	if (diskFull) {
 		ERROR_LOG(FILESYS, "Disk full");
-		auto err = GetI18NCategory("Error");
-		host->NotifyUserMessage(err->T("Disk full while writing data"));
+		auto err = GetI18NCategory(I18NCat::ERRORS);
+		System_NotifyUserMessage(err->T("Disk full while writing data"));
 		// We only return an error when the disk is actually full.
 		// When writing this would cause the disk to be full, so it wasn't written, we return 0.
 		if (MemoryStick_FreeSpace() == 0) {
@@ -588,7 +561,7 @@ int DirectoryFileSystem::OpenFile(std::string filename, FileAccess access, const
 	OpenFileEntry entry;
 	entry.hFile.fileSystemFlags_ = flags;
 	u32 err = 0;
-	bool success = entry.hFile.Open(basePath, filename, access, err);
+	bool success = entry.hFile.Open(basePath, filename, (FileAccess)(access & FILEACCESS_PSP_FLAGS), err);
 	if (err == 0 && !success) {
 		err = SCE_KERNEL_ERROR_ERRNO_FILE_NOT_FOUND;
 	}
@@ -604,7 +577,9 @@ int DirectoryFileSystem::OpenFile(std::string filename, FileAccess access, const
 #else
 		logError = (int)errno;
 #endif
-		ERROR_LOG(FILESYS, "DirectoryFileSystem::OpenFile('%s'): FAILED, %d - access = %d '%s'", filename.c_str(), logError, (int)access, errorString.c_str());
+		if (!(access & FILEACCESS_PPSSPP_QUIET)) {
+			ERROR_LOG(FILESYS, "DirectoryFileSystem::OpenFile('%s'): FAILED, %d - access = %d '%s'", filename.c_str(), logError, (int)(access & FILEACCESS_PSP_FLAGS), errorString.c_str());
+		}
 		return err;
 	} else {
 #ifdef _WIN32
@@ -616,7 +591,7 @@ int DirectoryFileSystem::OpenFile(std::string filename, FileAccess access, const
 		u32 newHandle = hAlloc->GetNewHandle();
 
 		entry.guestFilename = filename;
-		entry.access = access;
+		entry.access = (FileAccess)(access & FILEACCESS_PSP_FLAGS);
 
 		entries[newHandle] = entry;
 
@@ -931,20 +906,25 @@ void DirectoryFileSystem::DoState(PointerWrap &p) {
 			Do(p, entry.guestFilename);
 			Do(p, entry.access);
 			u32 err;
+			bool brokenFile = false;
 			if (!entry.hFile.Open(basePath,entry.guestFilename,entry.access, err)) {
 				ERROR_LOG(FILESYS, "Failed to reopen file while loading state: %s", entry.guestFilename.c_str());
-				continue;
+				brokenFile = true;
 			}
 			u32 position;
 			Do(p, position);
 			if (position != entry.hFile.Seek(position, FILEMOVE_BEGIN)) {
 				ERROR_LOG(FILESYS, "Failed to restore seek position while loading state: %s", entry.guestFilename.c_str());
-				continue;
+				brokenFile = true;
 			}
 			if (s >= 2) {
 				Do(p, entry.hFile.needsTrunc_);
 			}
-			entries[key] = entry;
+			// Let's hope that things don't go that badly with the file mysteriously auto-closed.
+			// Better than not loading the save state at all, hopefully.
+			if (!brokenFile) {
+				entries[key] = entry;
+			}
 		}
 	} else {
 		for (auto iter = entries.begin(); iter != entries.end(); ++iter) {
@@ -1007,7 +987,7 @@ int VFSFileSystem::OpenFile(std::string filename, FileAccess access, const char 
 	VERBOSE_LOG(FILESYS, "VFSFileSystem actually opening %s (%s)", fullNameC, filename.c_str());
 
 	size_t size;
-	u8 *data = VFSReadFile(fullNameC, &size);
+	u8 *data = g_VFS.ReadFile(fullNameC, &size);
 	if (!data) {
 		ERROR_LOG(FILESYS, "VFSFileSystem failed to open %s", filename.c_str());
 		return SCE_KERNEL_ERROR_ERRNO_FILE_NOT_FOUND;
@@ -1028,7 +1008,7 @@ PSPFileInfo VFSFileSystem::GetFileInfo(std::string filename) {
 
 	std::string fullName = GetLocalPath(filename);
 	File::FileInfo fo;
-	if (VFSGetFileInfo(fullName.c_str(), &fo)) {
+	if (g_VFS.GetFileInfo(fullName.c_str(), &fo)) {
 		x.exists = fo.exists;
 		if (x.exists) {
 			x.size = fo.size;

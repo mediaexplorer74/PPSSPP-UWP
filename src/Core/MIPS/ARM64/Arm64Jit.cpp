@@ -81,7 +81,7 @@ static u32 JitMemCheck(u32 pc) {
 
 	// Note: pc may be the delay slot.
 	const auto op = Memory::Read_Instruction(pc, true);
-	s32 offset = (s16)(op & 0xFFFF);
+	s32 offset = SignExtend16ToS32(op & 0xFFFF);
 	if (MIPSGetInfo(op) & IS_VFPU)
 		offset &= 0xFFFC;
 	u32 addr = currentMIPS->r[MIPS_GET_RS(op)] + offset;
@@ -131,7 +131,9 @@ void Arm64Jit::DoState(PointerWrap &p) {
 	Do(p, js.startDefaultPrefix);
 	if (s >= 2) {
 		Do(p, js.hasSetRounding);
-		js.lastSetRounding = 0;
+		if (p.mode == PointerWrap::MODE_READ) {
+			js.lastSetRounding = 0;
+		}
 	} else {
 		js.hasSetRounding = 1;
 	}

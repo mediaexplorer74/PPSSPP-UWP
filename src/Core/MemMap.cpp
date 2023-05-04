@@ -196,6 +196,11 @@ bail:
 }
 
 bool MemoryMap_Setup(u32 flags) {
+#if PPSSPP_PLATFORM(UWP)
+	// We reserve the memory, then simply commit in TryBase.
+	base = (u8*)VirtualAllocFromApp(0, 0x10000000, MEM_RESERVE, PAGE_READWRITE);
+#else
+
 	// Figure out how much memory we need to allocate in total.
 	size_t total_mem = 0;
 	for (int i = 0; i < num_views; i++) {
@@ -211,6 +216,7 @@ bool MemoryMap_Setup(u32 flags) {
 		// It'll already have logged.
 		return false;
 	}
+#endif
 
 #if !PPSSPP_PLATFORM(ANDROID)
 	if (g_arena.NeedsProbing()) {
@@ -270,7 +276,7 @@ void MemoryMap_Shutdown(u32 flags) {
 	g_arena.ReleaseSpace();
 
 #if PPSSPP_PLATFORM(UWP)
-	//VirtualFree(base, 0, MEM_RELEASE);
+	VirtualFree(base, 0, MEM_RELEASE);
 #endif
 }
 

@@ -37,7 +37,6 @@
 #include "Core/Config.h"
 #include "Core/CoreTiming.h"
 #include "Core/CoreParameter.h"
-#include "Core/Host.h"
 #include "Core/Reporting.h"
 #include "Core/Core.h"
 #include "Core/System.h"
@@ -285,10 +284,6 @@ void __DisplayDoState(PointerWrap &p) {
 
 	if (p.mode == p.MODE_READ) {
 		gpu->ReapplyGfxState();
-
-		if (hasSetMode) {
-			gpu->InitClear();
-		}
 		gpu->SetDisplayFramebuffer(framebuf.topaddr, framebuf.stride, framebuf.fmt);
 	}
 }
@@ -551,8 +546,12 @@ void __DisplayFlip(int cyclesLate) {
 	bool duplicateFrames = g_Config.bRenderDuplicateFrames && g_Config.iFrameSkip == 0;
 
 	bool fastForwardSkipFlip = g_Config.iFastForwardMode != (int)FastForwardMode::CONTINUOUS;
-	if (g_Config.bVSync && GetGPUBackend() == GPUBackend::VULKAN) {
+
+	bool fifo = gpu && gpu->GetDrawContext() && gpu->GetDrawContext()->GetPresentationMode() == Draw::PresentationMode::FIFO;
+
+	if (fifo && GetGPUBackend() == GPUBackend::VULKAN) {
 		// Vulkan doesn't support the interval setting, so we force skipping the flip.
+		// TODO: We'll clean this up in a more backend-independent way later.
 		fastForwardSkipFlip = true;
 	}
 
@@ -575,11 +574,11 @@ void __DisplayFlip(int cyclesLate) {
 			PSP_CoreParameter().fpsLimit == FPSLimit::NORMAL &&
 			DisplayIsRunningSlow()) {
 #ifndef _DEBUG
-			auto err = GetI18NCategory("Error");
+			auto err = GetI18NCategory(I18NCat::ERRORS);
 			if (g_Config.bSoftwareRendering) {
-				host->NotifyUserMessage(err->T("Running slow: Try turning off Software Rendering"), 6.0f, 0xFF30D0D0);
+				System_NotifyUserMessage(err->T("Running slow: Try turning off Software Rendering"), 6.0f, 0xFF30D0D0);
 			} else {
-				host->NotifyUserMessage(err->T("Running slow: try frameskip, sound is choppy when slow"), 6.0f, 0xFF30D0D0);
+				System_NotifyUserMessage(err->T("Running slow: try frameskip, sound is choppy when slow"), 6.0f, 0xFF30D0D0);
 			}
 #endif
 			hasNotifiedSlow = true;
@@ -749,10 +748,7 @@ static u32 sceDisplaySetMode(int displayMode, int displayWidth, int displayHeigh
 		return hleLogWarning(SCEDISPLAY, SCE_KERNEL_ERROR_INVALID_SIZE, "invalid size");
 	}
 
-	if (!hasSetMode) {
-		gpu->InitClear();
-		hasSetMode = true;
-	}
+	hasSetMode = true;
 	mode = displayMode;
 	width = displayWidth;
 	height = displayHeight;

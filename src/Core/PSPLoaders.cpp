@@ -19,6 +19,7 @@
 
 #include "Common/Data/Encoding/Utf8.h"
 #include "Common/Thread/ThreadUtil.h"
+#include "Common/System/Request.h"
 
 #include "Common/File/FileUtil.h"
 #include "Common/StringUtils.h"
@@ -43,8 +44,6 @@
 #include "Core/MIPS/MIPS.h"
 #include "Core/MIPS/MIPSAnalyst.h"
 #include "Core/MIPS/MIPSCodeUtils.h"
-
-#include "Host.h"
 
 #include "Core/Config.h"
 #include "Core/ConfigValues.h"
@@ -248,7 +247,7 @@ bool Load_PSP_ISO(FileLoader *fileLoader, std::string *error_string) {
 		if (g_paramSFO.ReadSFO(paramsfo)) {
 			std::string title = StringFromFormat("%s : %s", g_paramSFO.GetValueString("DISC_ID").c_str(), g_paramSFO.GetValueString("TITLE").c_str());
 			INFO_LOG(LOADER, "%s", title.c_str());
-			host->SetWindowTitle(title.c_str());
+			System_SetWindowTitle(title);
 		}
 	}
 
@@ -306,7 +305,7 @@ bool Load_PSP_ISO(FileLoader *fileLoader, std::string *error_string) {
 
 	//in case we didn't go through EmuScreen::boot
 	g_Config.loadGameConfig(id, g_paramSFO.GetValueString("TITLE"));
-	host->SendUIMessage("config_loaded", "");
+	System_PostUIMessage("config_loaded", "");
 	INFO_LOG(LOADER, "Loading %s...", bootpath.c_str());
 
 	PSPLoaders_Shutdown();
@@ -419,9 +418,9 @@ bool Load_PSP_ELF_PBP(FileLoader *fileLoader, std::string *error_string) {
 
 	std::string homebrewName = PSP_CoreParameter().fileToStart.ToVisualString();
 	std::size_t lslash = homebrewName.find_last_of("/");
-#if PPSSPP_PLATFORM(UWP) && !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
+#if PPSSPP_PLATFORM(UWP)
 	if (lslash == homebrewName.npos) {
-		 lslash = homebrewName.find_last_of("\\");
+		lslash = homebrewName.find_last_of("\\");
 	}
 #endif
 	if (lslash != homebrewName.npos)
@@ -435,7 +434,7 @@ bool Load_PSP_ELF_PBP(FileLoader *fileLoader, std::string *error_string) {
 
 	std::string title = StringFromFormat("%s : %s", discID.c_str(), homebrewTitle.c_str());
 	INFO_LOG(LOADER, "%s", title.c_str());
-	host->SetWindowTitle(title.c_str());
+	System_SetWindowTitle(title);
 
 	// Migrate old save states from old versions of fake game IDs.
 	const Path savestateDir = GetSysDirectory(DIRECTORY_SAVESTATE);

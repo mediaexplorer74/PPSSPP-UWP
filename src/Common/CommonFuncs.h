@@ -36,6 +36,8 @@
 #define Crash() {asm ("bkpt #0");}
 #elif PPSSPP_ARCH(ARM64)
 #define Crash() {asm ("brk #0");}
+#elif PPSSPP_ARCH(RISCV64)
+#define Crash() {asm ("ebreak");}
 #else
 #include <signal.h>
 #define Crash() {kill(getpid(), SIGINT);}
@@ -83,5 +85,5 @@ inline u64 __rotr64(u64 x, unsigned int shift){
 	#define ftello _ftelli64
 	#define atoll _atoi64
 #endif
-	#define Crash() { __debugbreak(); }
+	#define Crash() {__debugbreak();}
 #endif // WIN32 ndef

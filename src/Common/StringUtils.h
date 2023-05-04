@@ -61,6 +61,10 @@ inline bool endsWithNoCase(const std::string &str, const std::string &what) {
 	return strncasecmp(str.c_str() + offset, what.c_str(), what.size()) == 0;
 }
 
+inline bool equalsNoCase(const std::string &str, const char *what) {
+	return strcasecmp(str.c_str(), what) == 0;
+}
+
 void DataToHexString(const uint8_t *data, size_t size, std::string *output);
 void DataToHexString(int indent, uint32_t startAddr, const uint8_t* data, size_t size, std::string* output);
 
@@ -75,6 +79,10 @@ void SplitString(const std::string& str, const char delim, std::vector<std::stri
 void GetQuotedStrings(const std::string& str, std::vector<std::string>& output);
 
 std::string ReplaceAll(std::string input, const std::string& src, const std::string& dest);
+
+// Takes something like R&eplace and returns Replace, plus writes 'e' to *shortcutChar
+// if not nullptr. Useful for Windows menu strings.
+std::string UnescapeMenuString(const char *input, char *shortcutChar);
 
 void SkipSpace(const char **ptr);
 

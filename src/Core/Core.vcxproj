@@ -540,6 +540,7 @@
     <ClCompile Include="..\ext\udis86\syn-intel.c" />
     <ClCompile Include="..\ext\udis86\syn.c" />
     <ClCompile Include="..\ext\udis86\udis86.c" />
+    <ClCompile Include="ConfigSettings.cpp" />
     <ClCompile Include="ControlMapper.cpp" />
     <ClCompile Include="AVIDump.cpp" />
     <ClCompile Include="Debugger\MemBlockInfo.cpp" />
@@ -590,8 +591,8 @@
     <ClCompile Include="MIPS\IR\IRJit.cpp" />
     <ClCompile Include="MIPS\IR\IRPassSimplify.cpp" />
     <ClCompile Include="MIPS\IR\IRRegCache.cpp" />
+    <ClCompile Include="MIPS\MIPSVFPUFallbacks.cpp" />
     <ClCompile Include="Replay.cpp" />
-    <ClCompile Include="TextureReplacer.cpp" />
     <ClCompile Include="Compatibility.cpp" />
     <ClCompile Include="Config.cpp" />
     <ClCompile Include="Core.cpp" />
@@ -712,7 +713,6 @@
     <ClCompile Include="HLE\sceUtility.cpp" />
     <ClCompile Include="HLE\sceVaudio.cpp" />
     <ClCompile Include="HLE\__sceAudio.cpp" />
-    <ClCompile Include="Host.cpp" />
     <ClCompile Include="HW\MediaEngine.cpp" />
     <ClCompile Include="HW\MemoryStick.cpp" />
     <ClCompile Include="HW\MpegDemux.cpp" />
@@ -1041,6 +1041,7 @@
     <ClCompile Include="Screenshot.cpp" />
     <ClCompile Include="System.cpp" />
     <ClCompile Include="ThreadPools.cpp" />
+    <ClCompile Include="TiltEventProcessor.cpp" />
     <ClCompile Include="Util\AudioFormat.cpp" />
     <ClCompile Include="Util\BlockAllocator.cpp" />
     <ClCompile Include="Util\DisArm64.cpp" />
@@ -1110,6 +1111,7 @@
     <ClInclude Include="..\ext\udis86\types.h" />
     <ClInclude Include="..\ext\udis86\udint.h" />
     <ClInclude Include="..\ext\udis86\udis86.h" />
+    <ClInclude Include="ConfigSettings.h" />
     <ClInclude Include="ControlMapper.h" />
     <ClInclude Include="AVIDump.h" />
     <ClInclude Include="ConfigValues.h" />
@@ -1155,8 +1157,8 @@
     <ClInclude Include="MIPS\IR\IRJit.h" />
     <ClInclude Include="MIPS\IR\IRPassSimplify.h" />
     <ClInclude Include="MIPS\IR\IRRegCache.h" />
+    <ClInclude Include="MIPS\MIPSVFPUFallbacks.h" />
     <ClInclude Include="Replay.h" />
-    <ClInclude Include="TextureReplacer.h" />
     <ClInclude Include="Compatibility.h" />
     <ClInclude Include="Config.h" />
     <ClInclude Include="Core.h" />
@@ -1266,7 +1268,6 @@
     <ClInclude Include="HLE\sceVaudio.h" />
     <ClInclude Include="HLE\ThreadQueueList.h" />
     <ClInclude Include="HLE\__sceAudio.h" />
-    <ClInclude Include="Host.h" />
     <ClInclude Include="HW\BufferQueue.h" />
     <ClInclude Include="HW\MediaEngine.h" />
     <ClInclude Include="HW\MpegDemux.h" />
@@ -1397,6 +1398,7 @@
     <ClInclude Include="System.h" />
     <ClInclude Include="ThreadEventQueue.h" />
     <ClInclude Include="ThreadPools.h" />
+    <ClInclude Include="TiltEventProcessor.h" />
     <ClInclude Include="Util\AudioFormat.h" />
     <ClInclude Include="Util\BlockAllocator.h" />
     <ClInclude Include="Util\DisArm64.h" />

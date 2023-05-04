@@ -79,24 +79,23 @@ protected:
 };
 
 class D3D11PushBuffer;
-#ifdef _M_ARM
-__declspec(align(16)) class ShaderManagerD3D11 : public ShaderManagerCommon {
-#else
+
 class ShaderManagerD3D11 : public ShaderManagerCommon {
-#endif
 public:
 	ShaderManagerD3D11(Draw::DrawContext *draw, ID3D11Device *device, ID3D11DeviceContext *context, D3D_FEATURE_LEVEL featureLevel);
 	~ShaderManagerD3D11();
 
 	void GetShaders(int prim, VertexDecoder *decoder, D3D11VertexShader **vshader, D3D11FragmentShader **fshader, const ComputedPipelineState &pipelineState, bool useHWTransform, bool useHWTessellation, bool weightsAsFloat, bool useSkinInDecode);
-	void ClearShaders();
+	void ClearShaders() override;
 	void DirtyLastShader() override;
 
+	void DeviceLost() override { draw_ = nullptr; }
+	void DeviceRestore(Draw::DrawContext *draw) override { draw_ = draw; }
 	int GetNumVertexShaders() const { return (int)vsCache_.size(); }
 	int GetNumFragmentShaders() const { return (int)fsCache_.size(); }
 
-	std::vector<std::string> DebugGetShaderIDs(DebugShaderType type);
-	std::string DebugGetShaderString(std::string id, DebugShaderType type, DebugShaderStringType stringType);
+	std::vector<std::string> DebugGetShaderIDs(DebugShaderType type) override;
+	std::string DebugGetShaderString(std::string id, DebugShaderType type, DebugShaderStringType stringType) override;
 
 	uint64_t UpdateUniforms(bool useBufferedRendering);
 	void BindUniforms();
@@ -106,18 +105,6 @@ public:
 	bool IsBaseDirty() { return true; }
 	bool IsLightDirty() { return true; }
 	bool IsBoneDirty() { return true; }
-
-#ifdef _M_ARM
-	void* operator new(size_t i)
-	{
-		return _mm_malloc(i, 16);
-	}
-
-	void operator delete(void* p)
-	{
-		_mm_free(p);
-	}
-#endif
 
 private:
 	void Clear();

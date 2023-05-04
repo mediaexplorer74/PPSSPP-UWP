@@ -27,8 +27,10 @@ class GraphicsContext;
 // called from emu thread
 void UpdateRunLoop();
 
-void Core_Run(GraphicsContext *ctx);
+// Returns false when an UI exit state is detected.
+bool Core_Run(GraphicsContext *ctx);
 void Core_Stop();
+
 // For platforms that don't call Core_Run
 void Core_SetGraphicsContext(GraphicsContext *ctx);
 
@@ -110,16 +112,17 @@ void Core_Break(u32 pc);
 // Call when loading save states, etc.
 void Core_ResetException();
 
-enum class ExceptionType {
+enum class MIPSExceptionType {
 	NONE,
 	MEMORY,
 	BREAK,
 	BAD_EXEC_ADDR,
 };
 
-struct ExceptionInfo {
-	ExceptionType type;
+struct MIPSExceptionInfo {
+	MIPSExceptionType type;
 	std::string info;
+	std::string stackTrace;  // if available.
 
 	// Memory exception info
 	MemoryExceptionType memory_type;
@@ -132,8 +135,8 @@ struct ExceptionInfo {
 	ExecExceptionType exec_type;
 };
 
-const ExceptionInfo &Core_GetExceptionInfo();
+const MIPSExceptionInfo &Core_GetExceptionInfo();
 
-const char *ExceptionTypeAsString(ExceptionType type);
+const char *ExceptionTypeAsString(MIPSExceptionType type);
 const char *MemoryExceptionTypeAsString(MemoryExceptionType type);
 const char *ExecExceptionTypeAsString(ExecExceptionType type);

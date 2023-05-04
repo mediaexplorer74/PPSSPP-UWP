@@ -62,7 +62,7 @@ void DisassembleArm(const u8 *data, int size) {
 			int reg0 = (inst & 0x0000F000) >> 12;
 			int reg1 = (next & 0x0000F000) >> 12;
 			if (reg0 == reg1) {
-				sprintf(temp, "%08x MOV32 %s, %04x%04x", (u32)inst, ArmRegName(reg0), hi, low);
+				snprintf(temp, sizeof(temp), "%08x MOV32 %s, %04x%04x", (u32)inst, ArmRegName(reg0), hi, low);
 				INFO_LOG(JIT, "A:   %s", temp);
 				i += 4;
 				continue;
@@ -91,7 +91,7 @@ static u32 JitMemCheck(u32 pc) {
 
 	// Note: pc may be the delay slot.
 	const auto op = Memory::Read_Instruction(pc, true);
-	s32 offset = (s16)(op & 0xFFFF);
+	s32 offset = SignExtend16ToS32(op & 0xFFFF);
 	if (MIPSGetInfo(op) & IS_VFPU)
 		offset &= 0xFFFC;
 	u32 addr = currentMIPS->r[MIPS_GET_RS(op)] + offset;
@@ -111,7 +111,6 @@ ArmJit::ArmJit(MIPSState *mipsState) : blocks(mipsState, this), gpr(mipsState, &
 	blocks.Init();
 	gpr.SetEmitter(this);
 	fpr.SetEmitter(this);
-	//MemoryAccess macc(region, region_size);
 	AllocCodeSpace(1024 * 1024 * 16);  // 32MB is the absolute max because that's what an ARM branch instruction can reach, backwards and forwards.
 	GenerateFixedCode();
 
@@ -136,7 +135,9 @@ void ArmJit::DoState(PointerWrap &p)
 	Do(p, js.startDefaultPrefix);
 	if (s >= 2) {
 		Do(p, js.hasSetRounding);
-		js.lastSetRounding = 0;
+		if (p.mode == PointerWrap::MODE_READ) {
+			js.lastSetRounding = 0;
+		}
 	} else {
 		js.hasSetRounding = 1;
 	}
@@ -234,11 +235,15 @@ void ArmJit::Compile(u32 em_address) {
 	if (GetSpaceLeft() < 0x10000 || blocks.IsFull()) {
 		ClearCache();
 	}
-	
+
+	BeginWrite(JitBlockCache::MAX_BLOCK_INSTRUCTIONS * 16);
+
 	int block_num = blocks.AllocateBlock(em_address);
 	JitBlock *b = blocks.GetBlock(block_num);
 	DoJit(em_address, b);
 	blocks.FinalizeBlock(block_num, jo.enableBlocklink);
+
+	EndWrite();
 
 	bool cleanSlate = false;
 
@@ -431,16 +436,11 @@ void ArmJit::Comp_RunBlock(MIPSOpcode op)
 }
 
 void ArmJit::LinkBlock(u8 *exitPoint, const u8 *checkedEntry) {
-	if (!g_Config.bExecuteWriteResolver || g_Config.bSoftwareRendering) {
-		if (!g_Config.bLegacyHandlerReady) {
-			if (PlatformIsWXExclusive()) {
-				ProtectMemoryPages(exitPoint, 32, MEM_PROT_READ | MEM_PROT_WRITE);
-			}
-		}
+	if (PlatformIsWXExclusive()) {
+		ProtectMemoryPages(exitPoint, 32, MEM_PROT_READ | MEM_PROT_WRITE);
 	}
 
 	ARMXEmitter emit(exitPoint);
-
 	u32 op = *((const u32 *)emit.GetCodePointer());
 	bool prelinked = (op & 0xFF000000) == 0xEA000000;
 	// Jump directly to the block, yay.
@@ -456,39 +456,26 @@ void ArmJit::LinkBlock(u8 *exitPoint, const u8 *checkedEntry) {
 		} while ((op & 0xFF000000) != 0xEA000000 && (op & 0xFFF000F0) != 0xE1200070);
 	}
 	emit.FlushIcache();
-	if (!g_Config.bExecuteWriteResolver || g_Config.bSoftwareRendering) {
-		if (!g_Config.bLegacyHandlerReady) {
-			if (PlatformIsWXExclusive()) {
-				ProtectMemoryPages(exitPoint, 32, MEM_PROT_READ | MEM_PROT_EXEC);
-			}
-		}
+	if (PlatformIsWXExclusive()) {
+		ProtectMemoryPages(exitPoint, 32, MEM_PROT_READ | MEM_PROT_EXEC);
 	}
 }
 
 void ArmJit::UnlinkBlock(u8 *checkedEntry, u32 originalAddress) {
-	if (!g_Config.bExecuteWriteResolver || g_Config.bSoftwareRendering) {
-		if (!g_Config.bLegacyHandlerReady) {
-			if (PlatformIsWXExclusive()) {
-				ProtectMemoryPages(checkedEntry, 16, MEM_PROT_READ | MEM_PROT_WRITE);
-			}
-		}
+	if (PlatformIsWXExclusive()) {
+		ProtectMemoryPages(checkedEntry, 16, MEM_PROT_READ | MEM_PROT_WRITE);
 	}
 	// Send anyone who tries to run this block back to the dispatcher.
 	// Not entirely ideal, but .. pretty good.
 	// I hope there's enough space...
 	// checkedEntry is the only "linked" entrance so it's enough to overwrite that.
 	ARMXEmitter emit(checkedEntry);
-
 	emit.MOVI2R(R0, originalAddress);
 	emit.STR(R0, CTXREG, offsetof(MIPSState, pc));
 	emit.B(MIPSComp::jit->GetDispatcher());
 	emit.FlushIcache();
-	if (!g_Config.bExecuteWriteResolver || g_Config.bSoftwareRendering) {
-		if (!g_Config.bLegacyHandlerReady) {
-			if (PlatformIsWXExclusive()) {
-				ProtectMemoryPages(checkedEntry, 16, MEM_PROT_READ | MEM_PROT_EXEC);
-			}
-		}
+	if (PlatformIsWXExclusive()) {
+		ProtectMemoryPages(checkedEntry, 16, MEM_PROT_READ | MEM_PROT_EXEC);
 	}
 }
 
@@ -802,7 +789,7 @@ bool ArmJit::CheckMemoryBreakpoint(int instructionOffset) {
 		MOVI2R(R0, GetCompilerPC());
 		MovToPC(R0);
 		if (off != 0)
-			ADDI2R(R0, R0, off, SCRATCHREG2);
+			ADDI2R(R0, R0, off * 4, SCRATCHREG2);
 		QuickCallFunction(SCRATCHREG2, &JitMemCheck);
 
 		// If 0, the breakpoint wasn't tripped.

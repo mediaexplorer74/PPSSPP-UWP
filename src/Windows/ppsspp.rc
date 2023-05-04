@@ -193,6 +193,7 @@ BEGIN
     CONTROL         "",IDC_THREADLIST,"SysListView32",LVS_ALIGNLEFT | LVS_SHOWSELALWAYS | LVS_REPORT | WS_BORDER,1,338,513,93
     CONTROL         "",IDC_STACKFRAMES,"SysListView32",LVS_ALIGNLEFT | LVS_SHOWSELALWAYS | LVS_REPORT | WS_BORDER,1,338,513,93
     CONTROL         "",IDC_MODULELIST,"SysListView32",LVS_ALIGNLEFT | LVS_SHOWSELALWAYS | LVS_REPORT | WS_BORDER,1,338,513,93
+    CONTROL         "",IDC_WATCHLIST,"SysListView32",LVS_ALIGNLEFT | LVS_SHOWSELALWAYS | LVS_REPORT | WS_BORDER,1,338,513,93
     CONTROL         "",IDC_DEBUG_BOTTOMTABS,"SysTabControl32",TCS_TABS | TCS_FOCUSNEVER,1,338,513,93
 END
 
@@ -388,6 +389,23 @@ BEGIN
     PUSHBUTTON      "Cancel",IDCANCEL,173,79,50,14
 END
 
+IDD_CPUWATCH DIALOGEX 0, 0, 236, 90
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Watch"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Name",IDC_STATIC,7,9,36,8
+    EDITTEXT        IDC_BREAKPOINT_ADDRESS,56,7,173,14,ES_AUTOHSCROLL
+    LTEXT           "Expression",IDC_STATIC,7,28,36,8
+    EDITTEXT        IDC_BREAKPOINT_CONDITION,56,26,173,14,ES_AUTOHSCROLL
+    CONTROL         "Hex",IDC_DISASM_FMT_HEX,"Button",BS_AUTORADIOBUTTON | WS_GROUP,56,45,34,9
+    CONTROL         "Integer",IDC_DISASM_FMT_INT,"Button",BS_AUTORADIOBUTTON,90,45,34,9
+    CONTROL         "Float",IDC_DISASM_FMT_FLOAT,"Button",BS_AUTORADIOBUTTON,134,45,34,9
+    CONTROL         "String",IDC_DISASM_FMT_STR,"Button",BS_AUTORADIOBUTTON,178,45,34,9
+    DEFPUSHBUTTON   "OK",IDC_BREAKPOINT_OK,144,66,41,14
+    PUSHBUTTON      "Cancel",IDC_BREAKPOINT_CANCEL,186,66,42,14
+END
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -537,6 +555,7 @@ BEGIN
         MENUITEM "GE Debugger...",                          ID_DEBUG_GEDEBUGGER
         MENUITEM "Extract File...",                         ID_DEBUG_EXTRACTFILE
         MENUITEM "Log Console",                             ID_DEBUG_LOG
+        MENUITEM "Copy PSP memory base address",            ID_DEBUG_MEMORYBASE
         MENUITEM "Memory View...",                          ID_DEBUG_MEMORYVIEW
     END
 
@@ -639,7 +658,6 @@ BEGIN
         END
         MENUITEM "Hardware Transform",                  ID_OPTIONS_HARDWARETRANSFORM
         MENUITEM "Vertex Cache",                        ID_OPTIONS_VERTEXCACHE
-        MENUITEM "Show FPS Counter",                    ID_OPTIONS_SHOWFPS
         MENUITEM "", 0, MFT_SEPARATOR
         MENUITEM "Enable Sound",                        ID_EMULATION_SOUND
         MENUITEM "", 0, MFT_SEPARATOR
@@ -697,6 +715,8 @@ BEGIN
         MENUITEM "Go to Extent Begin",         ID_MEMVIEW_EXTENTBEGIN
         MENUITEM "Go to Extent End",           ID_MEMVIEW_EXTENTEND
         MENUITEM SEPARATOR
+        MENUITEM "Copy Float (32 bit)",        ID_MEMVIEW_COPYFLOAT_32
+        MENUITEM SEPARATOR
         MENUITEM "Copy Value (8 bit)",         ID_MEMVIEW_COPYVALUE_8
         MENUITEM "Copy Value (16 bit)",        ID_MEMVIEW_COPYVALUE_16
         MENUITEM "Copy Value (32 bit)",        ID_MEMVIEW_COPYVALUE_32
@@ -721,6 +741,7 @@ BEGIN
         MENUITEM "Rename Function...",         ID_DISASM_RENAMEFUNCTION
         MENUITEM "Remove Function",            ID_DISASM_REMOVEFUNCTION
         MENUITEM "Add Function Here",          ID_DISASM_ADDFUNCTION
+        MENUITEM "NOP instruction(s)",         ID_DISASM_NOPINSTRUCTION
     END
     POPUP "reglist"
     BEGIN
@@ -734,6 +755,7 @@ BEGIN
     BEGIN
         MENUITEM "Enable",                     ID_DISASM_DISABLEBREAKPOINT
         MENUITEM "Edit",                       ID_DISASM_EDITBREAKPOINT
+        MENUITEM "Delete",                     ID_DISASM_DELETEBREAKPOINT
         MENUITEM SEPARATOR
         MENUITEM "Add New",                    ID_DISASM_ADDNEWBREAKPOINT
     END
@@ -798,6 +820,17 @@ BEGIN
         MENUITEM "Show in &Left Pane"          ID_GEDBG_SHOWONLEFT
         MENUITEM "Show in &Right Pane"         ID_GEDBG_SHOWONRIGHT
         MENUITEM "Show in &Top Right Pane"     ID_GEDBG_SHOWONTOPRIGHT
+    END
+    POPUP "cpuwatchlist"
+    BEGIN
+        MENUITEM "Edit",                       ID_DISASM_EDITBREAKPOINT
+        MENUITEM "Delete",                     ID_DISASM_DELETEBREAKPOINT
+        MENUITEM SEPARATOR
+        MENUITEM "Add New",                    ID_DISASM_ADDNEWBREAKPOINT
+    END
+    POPUP "cpuaddwatch"
+    BEGIN
+        MENUITEM "Add New",                    ID_DISASM_ADDNEWBREAKPOINT
     END
 END
 

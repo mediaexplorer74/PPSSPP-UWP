@@ -22,9 +22,9 @@
 #include "Common/Data/Format/ZIMLoad.h"
 #include "Common/Serialize/Serializer.h"
 #include "Common/Serialize/SerializeFuncs.h"
+#include "Common/System/System.h"
 #include "Common/StringUtils.h"
 #include "Core/Config.h"
-#include "Core/Host.h"
 #include "Core/Reporting.h"
 #include "Core/System.h"
 #include "Core/Debugger/MemBlockInfo.h"
@@ -455,8 +455,8 @@ int SavedataParam::Save(SceUtilitySavedataParam* param, const std::string &saveD
 
 	if (!pspFileSystem.GetFileInfo(dirPath).exists) {
 		if (!pspFileSystem.MkDir(dirPath)) {
-			auto err = GetI18NCategory("Error");
-			host->NotifyUserMessage(err->T("Unable to write savedata, disk may be full"));
+			auto err = GetI18NCategory(I18NCat::ERRORS);
+			System_NotifyUserMessage(err->T("Unable to write savedata, disk may be full"));
 		}
 	}
 
@@ -484,8 +484,8 @@ int SavedataParam::Save(SceUtilitySavedataParam* param, const std::string &saveD
 		}
 
 		if (EncryptData(decryptMode, cryptedData, &cryptedSize, &aligned_len, cryptedHash, (hasKey ? param->key : 0)) != 0) {
-			auto err = GetI18NCategory("Error");
-			host->NotifyUserMessage(err->T("Save encryption failed. This save won't work on real PSP"), 6.0f);
+			auto err = GetI18NCategory(I18NCat::ERRORS);
+			System_NotifyUserMessage(err->T("Save encryption failed. This save won't work on real PSP"), 6.0f);
 			ERROR_LOG(SCEUTILITY,"Save encryption failed. This save won't work on real PSP");
 			delete[] cryptedData;
 			cryptedData = 0;
@@ -774,9 +774,9 @@ u32 SavedataParam::LoadCryptedSave(SceUtilitySavedataParam *param, u8 *data, con
 
 			// Don't notify the user if we're not going to upgrade the save.
 			if (!g_Config.bEncryptSave) {
-				auto di = GetI18NCategory("Dialog");
-				host->NotifyUserMessage(di->T("When you save, it will load on a PSP, but not an older PPSSPP"), 6.0f);
-				host->NotifyUserMessage(di->T("Old savedata detected"), 6.0f);
+				auto di = GetI18NCategory(I18NCat::DIALOG);
+				System_NotifyUserMessage(di->T("When you save, it will load on a PSP, but not an older PPSSPP"), 6.0f);
+				System_NotifyUserMessage(di->T("Old savedata detected"), 6.0f);
 			}
 		} else {
 			if (decryptMode == 5 && prevCryptMode == 3) {
@@ -786,9 +786,9 @@ u32 SavedataParam::LoadCryptedSave(SceUtilitySavedataParam *param, u8 *data, con
 			}
 			if (g_Config.bSavedataUpgrade) {
 				decryptMode = prevCryptMode;
-				auto di = GetI18NCategory("Dialog");
-				host->NotifyUserMessage(di->T("When you save, it will not work on outdated PSP Firmware anymore"), 6.0f);
-				host->NotifyUserMessage(di->T("Old savedata detected"), 6.0f);
+				auto di = GetI18NCategory(I18NCat::DIALOG);
+				System_NotifyUserMessage(di->T("When you save, it will not work on outdated PSP Firmware anymore"), 6.0f);
+				System_NotifyUserMessage(di->T("Old savedata detected"), 6.0f);
 			}
 		}
 		hasKey = decryptMode > 1;

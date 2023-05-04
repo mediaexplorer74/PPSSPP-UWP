@@ -7,13 +7,15 @@
 #include <set>
 #include <string>
 #include <mutex>
+#include <queue>
 #include <condition_variable>
 
-#include "Common/GPU/OpenGL/GLCommon.h"
 #include "Common/GPU/MiscTypes.h"
 #include "Common/Data/Convert/SmallDataConvert.h"
 #include "Common/Log.h"
-#include "GLQueueRunner.h"
+#include "Common/GPU/OpenGL/GLQueueRunner.h"
+#include "Common/GPU/OpenGL/GLFrameData.h"
+#include "Common/GPU/OpenGL/GLCommon.h"
 
 class GLRInputLayout;
 class GLPushBuffer;
@@ -349,30 +351,6 @@ private:
 	GLBufferStrategy strategy_ = GLBufferStrategy::SUBDATA;
 };
 
-enum class GLRRunType {
-	END,
-	SYNC,
-};
-
-class GLDeleter {
-public:
-	void Perform(GLRenderManager *renderManager, bool skipGLCalls);
-
-	bool IsEmpty() const {
-		return shaders.empty() && programs.empty() && buffers.empty() && textures.empty() && inputLayouts.empty() && framebuffers.empty() && pushBuffers.empty();
-	}
-
-	void Take(GLDeleter &other);
-
-	std::vector<GLRShader *> shaders;
-	std::vector<GLRProgram *> programs;
-	std::vector<GLRBuffer *> buffers;
-	std::vector<GLRTexture *> textures;
-	std::vector<GLRInputLayout *> inputLayouts;
-	std::vector<GLRFramebuffer *> framebuffers;
-	std::vector<GLPushBuffer *> pushBuffers;
-};
-
 class GLRInputLayout {
 public:
 	struct Entry {
@@ -387,6 +365,25 @@ public:
 	int semanticsMask_ = 0;
 };
 
+enum class GLRRunType {
+	PRESENT,
+	SYNC,
+	EXIT,
+};
+
+class GLRenderManager;
+class GLPushBuffer;
+
+// These are enqueued from the main thread,
+// and the render thread pops them off
+struct GLRRenderThreadTask {
+	std::vector<GLRStep *> steps;
+	std::vector<GLRInitStep> initSteps;
+
+	int frame;
+	GLRRunType runType;
+};
+
 // Note: The GLRenderManager is created and destroyed on the render thread, and the latter
 // happens after the emu thread has been destroyed. Therefore, it's safe to run wild deleting stuff
 // directly in the destructor.
@@ -395,9 +392,15 @@ public:
 	GLRenderManager() {}
 	~GLRenderManager();
 
+
 	void SetInvalidationCallback(InvalidationCallback callback) {
 		invalidationCallback_ = callback;
 	}
+
+	void ThreadStart(Draw::DrawContext *draw);
+	void ThreadEnd();
+	bool ThreadFrame();  // Returns true if it did anything. False means the queue was empty.
+
 	void SetErrorCallback(ErrorCallbackFn callback, void *userdata) {
 		queueRunner_.SetErrorCallback(callback, userdata);
 	}
@@ -406,27 +409,16 @@ public:
 		caps_ = caps;
 	}
 
-	void ThreadStart(Draw::DrawContext *draw);
-	void ThreadEnd();
-	bool ThreadFrame();  // Returns false to request exiting the loop.
-
 	// Makes sure that the GPU has caught up enough that we can start writing buffers of this frame again.
 	void BeginFrame();
 	// Can run on a different thread!
-	void Finish();
-	void Run(int frame);
-
-	// Zaps queued up commands. Use if you know there's a risk you've queued up stuff that has already been deleted. Can happen during in-game shutdown.
-	void Wipe();
-
-	// Wait until no frames are pending.  Use during shutdown before freeing pointers.
-	void WaitUntilQueueIdle();
+	void Finish(); 
 
 	// Creation commands. These were not needed in Vulkan since there we can do that on the main thread.
 	// We pass in width/height here even though it's not strictly needed until we support glTextureStorage
 	// and then we'll also need formats and stuff.
 	GLRTexture *CreateTexture(GLenum target, int width, int height, int depth, int numMips) {
-		GLRInitStep step{ GLRInitStepType::CREATE_TEXTURE };
+		GLRInitStep step { GLRInitStepType::CREATE_TEXTURE };
 		step.create_texture.texture = new GLRTexture(caps_, width, height, depth, numMips);
 		step.create_texture.texture->target = target;
 		initSteps_.push_back(step);
@@ -540,9 +532,13 @@ public:
 		pushbuffer->End();
 	}
 
+	bool IsInRenderPass() const {
+		return curRenderStep_ && curRenderStep_->stepType == GLRStepType::RENDER;
+	}
+
 	// This starts a new step (like a "render pass" in Vulkan).
 	//
-	// After a "CopyFramebuffer" or the other functions that start "steps", you need to call this beforce
+	// After a "CopyFramebuffer" or the other functions that start "steps", you need to call this before
 	// making any new render state changes or draw calls.
 	//
 	// The following state needs to be reset by the caller after calling this (and will thus not safely carry over from
@@ -559,7 +555,7 @@ public:
 	// Binds a framebuffer as a texture, for the following draws.
 	void BindFramebufferAsTexture(GLRFramebuffer *fb, int binding, int aspectBit);
 
-	bool CopyFramebufferToMemorySync(GLRFramebuffer *src, int aspectBits, int x, int y, int w, int h, Draw::DataFormat destFormat, uint8_t *pixels, int pixelStride, const char *tag);
+	bool CopyFramebufferToMemory(GLRFramebuffer *src, int aspectBits, int x, int y, int w, int h, Draw::DataFormat destFormat, uint8_t *pixels, int pixelStride, Draw::ReadbackMode mode, const char *tag);
 	void CopyImageToMemorySync(GLRTexture *texture, int mipLevel, int x, int y, int w, int h, Draw::DataFormat destFormat, uint8_t *pixels, int pixelStride, const char *tag);
 
 	void CopyFramebuffer(GLRFramebuffer *src, GLRect2D srcRect, GLRFramebuffer *dst, GLOffset2D dstPos, int aspectMask, const char *tag);
@@ -620,6 +616,11 @@ public:
 	}
 
 	void BindTexture(int slot, GLRTexture *tex) {
+		if (!curRenderStep_ && !tex) {
+			// Likely a pre-emptive bindtexture for D3D11 to avoid hazards. Not necessary.
+			// This can happen in BlitUsingRaster.
+			return;
+		}
 		_dbg_assert_(curRenderStep_ && curRenderStep_->stepType == GLRStepType::RENDER);
 		_dbg_assert_(slot < MAX_GL_TEXTURE_SLOTS);
 		GLRRenderData data{ GLRRenderCommand::BINDTEXTURE };
@@ -637,14 +638,6 @@ public:
 #ifdef _DEBUG
 		curProgram_ = program;
 #endif
-	}
-
-	void BindPixelPackBuffer(GLRBuffer *buffer) {  // Want to support an offset but can't in ES 2.0. We supply an offset when binding the buffers instead.
-		_dbg_assert_(curRenderStep_ && curRenderStep_->stepType == GLRStepType::RENDER);
-		GLRRenderData data{ GLRRenderCommand::BIND_BUFFER };
-		data.bind_buffer.buffer = buffer;
-		data.bind_buffer.target = GL_PIXEL_PACK_BUFFER;
-		curRenderStep_->commands.push_back(data);
 	}
 
 	void BindIndexBuffer(GLRBuffer *buffer) {  // Want to support an offset but can't in ES 2.0. We supply an offset when binding the buffers instead.
@@ -981,8 +974,9 @@ public:
 		_dbg_assert_(foundCount == 1);
 	}
 
-	void SetSwapFunction(std::function<void()> swapFunction) {
+	void SetSwapFunction(std::function<void()> swapFunction, bool retainControl) {
 		swapFunction_ = swapFunction;
+		retainControl_ = retainControl;
 	}
 
 	void SetSwapIntervalFunction(std::function<void(int)> swapIntervalFunction) {
@@ -1014,13 +1008,10 @@ public:
 	}
 
 private:
-	void BeginSubmitFrame(int frame);
-	void EndSubmitFrame(int frame);
-	void Submit(int frame, bool triggerFence);
+	bool Run(GLRRenderThreadTask &task);
 
 	// Bad for performance but sometimes necessary for synchronous CPU readbacks (screenshots and whatnot).
 	void FlushSync();
-	void EndSyncFrame(int frame);
 
 	// When using legacy functionality for push buffers (glBufferData), we need to flush them
 	// before actually making the glDraw* calls. It's best if the render manager handles that.
@@ -1028,35 +1019,7 @@ private:
 		frameData_[frame].activePushBuffers.insert(buffer);
 	}
 
-	// Per-frame data, round-robin so we can overlap submission with execution of the previous frame.
-	struct FrameData {
-		std::mutex push_mutex;
-		std::condition_variable push_condVar;
-
-		std::mutex pull_mutex;
-		std::condition_variable pull_condVar;
-
-		bool readyForFence = true;
-		bool readyForRun = false;
-		bool readyForSubmit = false;
-
-		bool skipSwap = false;
-		GLRRunType type = GLRRunType::END;
-
-		// GLuint fence; For future AZDO stuff?
-		std::vector<GLRStep *> steps;
-		std::vector<GLRInitStep> initSteps;
-
-		// Swapchain.
-		bool hasBegun = false;
-		uint32_t curSwapchainImage = -1;
-
-		GLDeleter deleter;
-		GLDeleter deleter_prev;
-		std::set<GLPushBuffer *> activePushBuffers;
-	};
-
-	FrameData frameData_[MAX_INFLIGHT_FRAMES];
+	GLFrameData frameData_[MAX_INFLIGHT_FRAMES];
 
 	// Submission time state
 	bool insideFrame_ = false;
@@ -1067,16 +1030,23 @@ private:
 
 	// Execution time state
 	bool run_ = true;
+
 	// Thread is managed elsewhere, and should call ThreadFrame.
-	std::mutex mutex_;
-	int threadInitFrame_ = 0;
 	GLQueueRunner queueRunner_;
 
-	// Thread state
-	int threadFrame_ = -1;
+	// For pushing data on the queue.
+	std::mutex pushMutex_;
+	std::condition_variable pushCondVar_;
 
-	bool nextFrame = false;
-	bool firstFrame = true;
+	std::queue<GLRRenderThreadTask> renderThreadQueue_;
+
+	// For readbacks and other reasons we need to sync with the render thread.
+	std::mutex syncMutex_;
+	std::condition_variable syncCondVar_;
+
+	bool firstFrame_ = true;
+	bool vrRenderStarted_ = false;
+	bool syncDone_ = false;
 
 	GLDeleter deleter_;
 	bool skipGLCalls_ = false;
@@ -1085,6 +1055,7 @@ private:
 
 	std::function<void()> swapFunction_;
 	std::function<void(int)> swapIntervalFunction_;
+	bool retainControl_ = false;
 	GLBufferStrategy bufferStrategy_ = GLBufferStrategy::SUBDATA;
 
 	int inflightFrames_ = MAX_INFLIGHT_FRAMES;

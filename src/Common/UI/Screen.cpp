@@ -138,7 +138,7 @@ void ScreenManager::deviceRestored() {
 }
 
 void ScreenManager::resized() {
-	INFO_LOG(SYSTEM, "ScreenManager::resized(dp: %dx%d)", dp_xres, dp_yres);
+	INFO_LOG(SYSTEM, "ScreenManager::resized(dp: %dx%d)", g_display.dp_xres, g_display.dp_yres);
 	std::lock_guard<std::recursive_mutex> guard(inputLock_);
 	// Have to notify the whole stack, otherwise there will be problems when going back
 	// to non-top screens.
@@ -202,7 +202,9 @@ void ScreenManager::sendMessage(const char *msg, const char *value) {
 	if (!strcmp(msg, "recreateviews"))
 		RecreateAllViews();
 	if (!strcmp(msg, "lost_focus")) {
-		TouchInput input;
+		TouchInput input{};
+		input.x = -50000.0f;
+		input.y = -50000.0f;
 		input.flags = TOUCH_RELEASE_ALL;
 		input.timestamp = time_now_d();
 		input.id = 0;
@@ -238,7 +240,9 @@ void ScreenManager::push(Screen *screen, int layerFlags) {
 
 	// Release touches and unfocus.
 	UI::SetFocusedView(nullptr);
-	TouchInput input;
+	TouchInput input{};
+	input.x = -50000.0f;
+	input.y = -50000.0f;
 	input.flags = TOUCH_RELEASE_ALL;
 	input.timestamp = time_now_d();
 	input.id = 0;

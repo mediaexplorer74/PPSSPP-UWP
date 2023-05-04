@@ -22,12 +22,12 @@
 #include "Common/GPU/OpenGL/GLFeatures.h"
 #include "Common/GPU/thin3d_create.h"
 #include "Common/GPU/OpenGL/GLRenderManager.h"
+#include "Common/System/System.h"
 #include "GL/gl.h"
 #include "GL/wglew.h"
 #include "Core/Config.h"
 #include "Core/ConfigValues.h"
 #include "Core/Core.h"
-#include "Core/Host.h"
 #include "Common/Data/Encoding/Utf8.h"
 #include "Common/Data/Text/I18n.h"
 #include "UI/OnScreenDisplay.h"
@@ -241,7 +241,7 @@ bool WindowsGLContext::InitFromRenderThread(std::string *error_message) {
 
 	// GL_VERSION                        GL_VENDOR        GL_RENDERER
 	// "1.4.0 - Build 8.14.10.2364"      "intel"          intel Pineview Platform
-	auto err = GetI18NCategory("Error");
+	auto err = GetI18NCategory(I18NCat::ERRORS);
 
 	std::string glVersion = (const char *)glGetString(GL_VERSION);
 	std::string glRenderer = (const char *)glGetString(GL_RENDERER);
@@ -422,7 +422,7 @@ bool WindowsGLContext::InitFromRenderThread(std::string *error_message) {
 	}
 
 	draw_->SetErrorCallback([](const char *shortDesc, const char *details, void *userdata) {
-		host->NotifyUserMessage(details, 5.0, 0xFFFFFFFF, "error_callback");
+		System_NotifyUserMessage(details, 5.0, 0xFFFFFFFF, "error_callback");
 	}, nullptr);
 
 	// These are auto-reset events.
@@ -432,7 +432,7 @@ bool WindowsGLContext::InitFromRenderThread(std::string *error_message) {
 	renderManager_ = (GLRenderManager *)draw_->GetNativeObject(Draw::NativeObject::RENDER_MANAGER);
 	renderManager_->SetInflightFrames(g_Config.iInflightFrames);
 	SetGPUBackend(GPUBackend::OPENGL);
-	renderManager_->SetSwapFunction([&]() {::SwapBuffers(hDC); });
+	renderManager_->SetSwapFunction([&]() {::SwapBuffers(hDC); }, true);
 	if (wglSwapIntervalEXT) {
 		// glew loads wglSwapIntervalEXT if available
 		renderManager_->SetSwapIntervalFunction([&](int interval) {
@@ -500,6 +500,5 @@ void WindowsGLContext::ThreadEnd() {
 }
 
 void WindowsGLContext::StopThread() {
-	renderManager_->WaitUntilQueueIdle();
 	renderManager_->StopThread();
 }

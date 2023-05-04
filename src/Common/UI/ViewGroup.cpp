@@ -21,9 +21,6 @@
 #include "Common/TimeUtil.h"
 #include "Common/StringUtils.h"
 
-#if PPSSPP_PLATFORM(UWP) && !defined(NO_UI_HELPER) && !defined(__LIBRETRO__)
-#include "UWP/UWPHelpers/UIHelpers.h"
-#endif
 namespace UI {
 
 static constexpr Size ITEM_HEIGHT = 64.f;
@@ -76,10 +73,6 @@ void ViewGroup::Clear() {
 		views_[i] = nullptr;
 	}
 	views_.clear();
-#if PPSSPP_PLATFORM(UWP) && !defined(NO_UI_HELPER) && !defined(__LIBRETRO__)
-	globalTextEdit = nullptr;
-	HideInputKeyboard();
-#endif
 }
 
 void ViewGroup::PersistData(PersistStatus status, std::string anonId, PersistMap &storage) {
@@ -738,7 +731,7 @@ void LinearLayout::Layout() {
 }
 
 std::string LinearLayoutList::DescribeText() const {
-	auto u = GetI18NCategory("UI Elements");
+	auto u = GetI18NCategory(I18NCat::UI_ELEMENTS);
 	return DescribeListOrdered(u->T("List:"));
 }
 
@@ -950,7 +943,7 @@ void GridLayout::Layout() {
 }
 
 std::string GridLayoutList::DescribeText() const {
-	auto u = GetI18NCategory("UI Elements");
+	auto u = GetI18NCategory(I18NCat::UI_ELEMENTS);
 	return DescribeListOrdered(u->T("List:"));
 }
 
@@ -1175,7 +1168,7 @@ void ChoiceStrip::Draw(UIContext &dc) {
 }
 
 std::string ChoiceStrip::DescribeText() const {
-	auto u = GetI18NCategory("UI Elements");
+	auto u = GetI18NCategory(I18NCat::UI_ELEMENTS);
 	return DescribeListUnordered(u->T("Choices:"));
 }
 

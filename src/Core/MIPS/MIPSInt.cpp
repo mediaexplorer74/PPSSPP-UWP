@@ -25,7 +25,6 @@
 #include "Common/CommonTypes.h"
 #include "Core/Config.h"
 #include "Core/Core.h"
-#include "Core/Host.h"
 #include "Core/MemMap.h"
 #include "Core/MIPS/MIPS.h"
 #include "Core/MIPS/MIPSCodeUtils.h"
@@ -95,7 +94,7 @@ namespace MIPSInt
 {
 	void Int_Cache(MIPSOpcode op)
 	{
-		int imm = (s16)(op & 0xFFFF);
+		int imm = SignExtend16ToS32(op & 0xFFFF);
 		int rs = _RS;
 		uint32_t addr = R(rs) + imm;
 		int func = (op >> 16) & 0x1F;
