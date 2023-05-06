@@ -5,6 +5,10 @@ Here you will find the x64 version temporary until an official release will be a
 
 <a href="https://github.com/basharast/PPSSPP-UWP-ARM/raw/main/x64/PPSSPP%201.15.1.zip">Click here to download</a>
 
+# Important
+
+This custom release has better performance than the offical release with higher resolutions 4K+
+
 # Changes 
 
 ## 1.15.1
