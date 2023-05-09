@@ -3,13 +3,18 @@ Here you will find the x64 version temporary until an official release will be a
 
 ## Download
 
-<a href="https://github.com/basharast/PPSSPP-UWP-ARM/raw/main/x64/PPSSPP%201.15.1.zip">Click here to download</a>
+<a href="https://github.com/basharast/PPSSPP-UWP-ARM/raw/main/x64/PPSSPP%201.15.3.zip">Click here to download</a>
 
 # Important
 
 This custom release has better performance than the offical release with higher resolutions 4K+
 
 # Changes 
+
+## 1.15.3
+
+- Synced the latest fixes from the official repo
+- Disable screen rotation for x64 (maybe it was casing flipped menu issue)
 
 ## 1.15.1
 
