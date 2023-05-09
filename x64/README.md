@@ -14,7 +14,7 @@ This custom release has better performance than the offical release with higher 
 ## 1.15.3
 
 - Synced the latest fixes from the official repo
-- Disable screen rotation for x64 (maybe it was casing flipped menu issue)
+- Disable screen rotation for x64 (maybe it was causing flipped menu issue)
 
 ## 1.15.1
 
