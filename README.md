@@ -16,7 +16,7 @@ An micro-RnD of PPSSPP-UWP client for the Windows 10 (Mobile) :)
 2. Clone the repo `git clone --recursive https://github.com/mediaexplorer74/PPSSPP-UWP`.
 3. Update all project dependencies (packages) 
 4. Compile the UWP app for needed platform (ARM is best one... but x86 is supported too)
-5. Try to load some PPSSPP-UWP-compatible game, i.e. "The Curse of Monkey Island (Windows CD)"
+5. Try to load some PPSSPP-UWP-compatible game... 
 6. Test & enjoy game process, sound tracks, oldschool cool graphics, etc.... =))
  
 ## Requirements
