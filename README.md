@@ -2,9 +2,9 @@
 An micro-RnD of PPSSPP-UWP client for the Windows 10 (Mobile) :)
     
 ## My "0.1 cents"
-1. RnD PPSSPP-UWP by Scemino (https://github.com/scemino/nscumm)
-2. RnD PPSSPP_UWP by Bashar Astifan (https://github.com/basharast/NScummUWP) 
-3. PPSSPP-UWP "refubrishing" (PPSSPP-UWP+PPSSPP-UWP-ARM synthez...)
+1. RnD PPSSPP by Henrik Rydgård (see https://github.com/hrydgard/ppsspp)
+2. RnD PPSSPP-UWP by Bashar Astifan (see https://github.com/basharast/PPSSPP-UWP-ARM) 
+3. PPSSPP-UWP "refubrishing" (PPSSPP+PPSSPP-UWP-ARM synthez...)
 4. Some "project modification-experimentation" applied (19041->15063->19041))
 
 ## Screenshots / Images
@@ -36,7 +36,7 @@ The following tools and SDKs are mandatory for the project development:
 
 ## Special thanks
 - [Henrik Rydgård](https://github.com/hrydgard) Original ppsspp's developer/author - see his project [ppsspp](https://github.com/hrydgard/ppsspp)
-- [Bashar Astifan](https://github.com/basharast) PPSSPP-UWP's developer/remaker/enhancer - see his project [PPSSPP-UWP](https://github.com/basharast/PPSSPP-UWP-ARM) 
+- [Bashar Astifan](https://github.com/basharast) PPSSPP-UWP's developer/remaker/enhancer - see his project [PPSSPP-UWP-ARM](https://github.com/basharast/PPSSPP-UWP-ARM) 
 
 ## License
 Copyright © 2015-2023 [PPSSPP-UWP](https://github.com/hrydgard/graphs/contributors).
