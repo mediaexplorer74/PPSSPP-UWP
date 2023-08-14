@@ -4,7 +4,7 @@ An micro-RnD of PPSSPP-UWP client for the Windows 10 (Mobile) :)
 ## My "0.1 cents"
 1. RnD PPSSPP by Henrik Rydgård (see https://github.com/hrydgard/ppsspp)
 2. RnD PPSSPP-UWP by Bashar Astifan (see https://github.com/basharast/PPSSPP-UWP-ARM) 
-3. PPSSPP-UWP "refubrishing" (PPSSPP+PPSSPP-UWP-ARM synthez...)
+3. PPSSPP-UWP "refactoring-reconstruction" (PPSSPP+PPSSPP-UWP-ARM synthez...)
 4. Some "project modification-experimentation" applied (19041->15063->19041))
 
 ## Screenshots / Images
@@ -13,7 +13,7 @@ An micro-RnD of PPSSPP-UWP client for the Windows 10 (Mobile) :)
 
 ## Build instructions
 1. First, check that you have the [necessary tools](#requirements) installed.
-2. Clone the repo `git clone --recursive https://github.com/mediaexplorer74/NScummUWP.git`.
+2. Clone the repo `git clone --recursive https://github.com/mediaexplorer74/PPSSPP-UWP`.
 3. Update all project dependencies (packages) 
 4. Compile the UWP app for needed platform (ARM is best one... but x86 is supported too)
 5. Try to load some PPSSPP-UWP-compatible game, i.e. "The Curse of Monkey Island (Windows CD)"
