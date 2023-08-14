@@ -35,8 +35,8 @@ The following tools and SDKs are mandatory for the project development:
 - Codebase reduction (Shrink iOS, MacOS, etc. :)
 
 ## Special thanks
-- Henrik Rydgård (https://github.com/hrydgard) Original ppsspp's developer/author - see his project [ppsspp](https://github.com/hrydgard/ppsspp)
-- Bashar Astifan (https://github.com/basharast) PPSSPP-UWP's developer/remaker/enhancer - see his project [PPSSPP-UWP](https://github.com/basharast/PPSSPP-UWP-ARM) 
+- [Henrik Rydgård](https://github.com/hrydgard) Original ppsspp's developer/author - see his project [ppsspp](https://github.com/hrydgard/ppsspp)
+- [Bashar Astifan](https://github.com/basharast) PPSSPP-UWP's developer/remaker/enhancer - see his project [PPSSPP-UWP](https://github.com/basharast/PPSSPP-UWP-ARM) 
 
 ## License
 Copyright © 2015-2023 [PPSSPP-UWP](https://github.com/hrydgard/graphs/contributors).
