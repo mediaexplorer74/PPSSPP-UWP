@@ -36,6 +36,7 @@
 #define ID_DEBUG_RESETSYMBOLTABLE       212
 #define IDI_STOP                        223
 #define IDD_INPUTBOX                    226
+#define IDD_USERPASSWORDBOX             227
 #define IDD_VFPU                        231
 #define IDD_BREAKPOINT                  233
 #define ID_FILE_LOAD_DIR                234
@@ -60,6 +61,7 @@
 #define IDD_GEDBG_TAB_MATRICES          255
 #define IDD_GEDBG_STEPCOUNT             256
 #define IDD_CPUWATCH                    257
+#define IDD_EDITSYMBOLS                  258
 
 #define IDC_STOPGO                      1001
 #define IDC_ADDRESS                     1002
@@ -75,10 +77,12 @@
 #define IDC_INPUTBOX                    1098
 #define IDC_MODENORMAL                  1099
 #define IDC_MODESYMBOLS                 1100
+#define IDC_PASSWORDBOX                 1101
 #define IDC_SEARCH_RESULTS              1102
 #define IDC_REGIONS                     1142
 #define IDC_REGLIST                     1146
 #define IDC_VALUENAME                   1148
+#define IDC_PASSWORDNAME                1149
 #define IDC_SHOWVFPU                    1161
 #define IDC_BREAKPOINTLIST              1164
 #define IDC_DEBUGMEMVIEW                1165
@@ -119,6 +123,12 @@
 #define IDC_SHOWOFFSETS                 1200
 #define IDC_GEDBG_PRIMCOUNTER           1201
 #define IDC_BUTTON_SEARCH               1204
+#define IDC_EDITSYMBOLS_SCAN             1205
+#define IDC_EDITSYMBOLS_REMOVE           1206
+#define IDC_EDITSYMBOLS_ADDRESS          1207
+#define IDC_EDITSYMBOLS_SIZE             1208
+#define IDC_EDITSYMBOLS_OK               1209
+#define IDC_EDITSYMBOLS_CANCEL           1210
 
 #define ID_FILE_EXIT                     40000
 #define ID_DEBUG_SAVEMAPFILE             40001
@@ -343,6 +353,7 @@
 #define IDC_DISASM_FMT_INT               40233
 #define IDC_DISASM_FMT_FLOAT             40234
 #define IDC_DISASM_FMT_STR               40235
+#define ID_DISASM_EDITSYMBOLS             40236
 
 
 // Dummy option to let the buffered rendering hotkey cycle through all the options.

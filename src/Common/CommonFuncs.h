@@ -30,8 +30,11 @@
 #include <unistd.h>
 #include <errno.h>
 
-#if PPSSPP_ARCH(X86) || PPSSPP_ARCH(AMD64)
+#if (PPSSPP_ARCH(X86) || PPSSPP_ARCH(AMD64)) && !defined(__EMSCRIPTEN__)
 #define Crash() {asm ("int $3");}
+#elif PPSSPP_PLATFORM(SWITCH)
+// TODO: Implement Crash() for Switch, lets not use breakpoint for the time being
+#define Crash() {*((volatile u32 *)0x0) = 0xDEADC0DE;}
 #elif PPSSPP_ARCH(ARM)
 #define Crash() {asm ("bkpt #0");}
 #elif PPSSPP_ARCH(ARM64)

@@ -30,6 +30,7 @@
 #include "Common/Data/Text/I18n.h"
 #include "Common/Profiler/Profiler.h"
 #include "Common/System/System.h"
+#include "Common/System/OSD.h"
 #include "Common/Serialize/Serializer.h"
 #include "Common/Serialize/SerializeFuncs.h"
 #include "Common/Serialize/SerializeMap.h"
@@ -37,6 +38,7 @@
 #include "Core/Config.h"
 #include "Core/CoreTiming.h"
 #include "Core/CoreParameter.h"
+#include "Core/FrameTiming.h"
 #include "Core/Reporting.h"
 #include "Core/Core.h"
 #include "Core/System.h"
@@ -48,6 +50,7 @@
 #include "Core/HLE/sceKernelInterrupt.h"
 #include "Core/HW/Display.h"
 #include "Core/Util/PPGeDraw.h"
+#include "Core/RetroAchievements.h"
 
 #include "GPU/GPU.h"
 #include "GPU/GPUState.h"
@@ -347,12 +350,25 @@ void __DisplaySetWasPaused() {
 }
 
 static int FrameTimingLimit() {
+	bool challenge = Achievements::ChallengeModeActive();
+
+	auto fixRate = [=](int limit) {
+		int minRate = challenge ? 60 : 1;
+		if (limit != 0) {
+			return std::max(limit, minRate);
+		} else {
+			return limit;
+		}
+	};
+
+	// Can't slow down in challenge mode.
 	if (PSP_CoreParameter().fpsLimit == FPSLimit::CUSTOM1)
-		return g_Config.iFpsLimit1;
+		return fixRate(g_Config.iFpsLimit1);
 	if (PSP_CoreParameter().fpsLimit == FPSLimit::CUSTOM2)
-		return g_Config.iFpsLimit2;
+		return fixRate(g_Config.iFpsLimit2);
 	if (PSP_CoreParameter().fpsLimit == FPSLimit::ANALOG)
-		return PSP_CoreParameter().analogFpsLimit;
+		return fixRate(PSP_CoreParameter().analogFpsLimit);
+	// Note: Fast-forward is OK in challenge mode.
 	if (PSP_CoreParameter().fastForward)
 		return 0;
 	return framerate;
@@ -481,7 +497,7 @@ static void DoFrameIdleTiming() {
 #endif
 		}
 
-		if (g_Config.bDrawFrameGraph || coreCollectDebugStats) {
+		if ((DebugOverlay)g_Config.iDebugOverlay == DebugOverlay::FRAME_GRAPH || coreCollectDebugStats) {
 			DisplayNotifySleep(time_now_d() - before);
 		}
 	}
@@ -490,6 +506,9 @@ static void DoFrameIdleTiming() {
 
 void hleEnterVblank(u64 userdata, int cyclesLate) {
 	int vbCount = userdata;
+
+	// This should be a good place to do it. Should happen once per vblank. Here or in leave? Not sure it matters much.
+	Achievements::FrameUpdate();
 
 	VERBOSE_LOG(SCEDISPLAY, "Enter VBlank %i", vbCount);
 
@@ -576,9 +595,9 @@ void __DisplayFlip(int cyclesLate) {
 #ifndef _DEBUG
 			auto err = GetI18NCategory(I18NCat::ERRORS);
 			if (g_Config.bSoftwareRendering) {
-				System_NotifyUserMessage(err->T("Running slow: Try turning off Software Rendering"), 6.0f, 0xFF30D0D0);
+				g_OSD.Show(OSDType::MESSAGE_INFO, err->T("Running slow: Try turning off Software Rendering"), 5.0f);
 			} else {
-				System_NotifyUserMessage(err->T("Running slow: try frameskip, sound is choppy when slow"), 6.0f, 0xFF30D0D0);
+				g_OSD.Show(OSDType::MESSAGE_INFO, err->T("Running slow: try frameskip, sound is choppy when slow"));
 			}
 #endif
 			hasNotifiedSlow = true;
@@ -600,7 +619,7 @@ void __DisplayFlip(int cyclesLate) {
 			}
 		}
 
-		// Setting CORE_NEXTFRAME causes a swap.
+		// Setting CORE_NEXTFRAME (which Core_NextFrame does) causes a swap.
 		const bool fbReallyDirty = gpu->FramebufferReallyDirty();
 		if (fbReallyDirty || noRecentFlip || postEffectRequiresFlip) {
 			// Check first though, might've just quit / been paused.
@@ -644,7 +663,7 @@ void __DisplayFlip(int cyclesLate) {
 		CoreTiming::ScheduleEvent(0 - cyclesLate, afterFlipEvent, 0);
 		numVBlanksSinceFlip = 0;
 
-		if (g_Config.bDrawFrameGraph || coreCollectDebugStats) {
+		if ((DebugOverlay)g_Config.iDebugOverlay == DebugOverlay::FRAME_GRAPH || coreCollectDebugStats) {
 			// Track how long we sleep (whether vsync or sleep_ms.)
 			DisplayNotifySleep(time_now_d() - frameSleepStart, frameSleepPos);
 		}
@@ -700,6 +719,8 @@ void hleLagSync(u64 userdata, int cyclesLate) {
 #ifndef _WIN32
 		const double left = goal - now;
 		usleep((long)(left * 1000000.0));
+#else
+		yield();
 #endif
 		now = time_now_d();
 	}
@@ -708,7 +729,7 @@ void hleLagSync(u64 userdata, int cyclesLate) {
 	const int over = (int)((now - goal) * 1000000);
 	ScheduleLagSync(over - emuOver);
 
-	if (g_Config.bDrawFrameGraph || coreCollectDebugStats) {
+	if ((DebugOverlay)g_Config.iDebugOverlay == DebugOverlay::FRAME_GRAPH || coreCollectDebugStats) {
 		DisplayNotifySleep(now - before);
 	}
 }

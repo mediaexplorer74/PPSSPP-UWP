@@ -13,17 +13,21 @@ enum {
 };
 
 enum class VKRRunType {
+	SUBMIT,
 	PRESENT,
 	SYNC,
 	EXIT,
 };
 
 struct QueueProfileContext {
+	bool enabled = false;
+	bool timestampsEnabled = false;
 	VkQueryPool queryPool;
 	std::vector<std::string> timestampDescriptions;
 	std::string profileSummary;
 	double cpuStartTime;
 	double cpuEndTime;
+	double descWriteTime;
 };
 
 class VKRFramebuffer;
@@ -50,8 +54,9 @@ struct FrameDataShared {
 
 	// For synchronous readbacks.
 	VkFence readbackFence = VK_NULL_HANDLE;
+	bool useMultiThreading;
 
-	void Init(VulkanContext *vulkan);
+	void Init(VulkanContext *vulkan, bool useMultiThreading);
 	void Destroy(VulkanContext *vulkan);
 };
 
@@ -91,9 +96,12 @@ struct FrameData {
 	// Swapchain.
 	uint32_t curSwapchainImage = -1;
 
+	// Frames need unique IDs to wait for present on, let's keep them here.
+	// Also used for indexing into the frame timing history buffer.
+	uint64_t frameId;
+
 	// Profiling.
-	QueueProfileContext profile;
-	bool profilingEnabled_ = false;
+	QueueProfileContext profile{};
 
 	// Async readback cache.
 	DenseHashMap<ReadbackKey, CachedReadback*, nullptr> readbacks_;

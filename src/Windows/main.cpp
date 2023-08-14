@@ -43,6 +43,7 @@
 #include "Common/Thread/ThreadUtil.h"
 #include "Common/Data/Encoding/Utf8.h"
 #include "Common/Net/Resolve.h"
+#include "Common/TimeUtil.h"
 #include "W32Util/DarkMode.h"
 #include "W32Util/ShellUtil.h"
 
@@ -114,6 +115,12 @@ int g_activeWindow = 0;
 WindowsInputManager g_inputManager;
 
 int g_lastNumInstances = 0;
+
+static double g_lastActivity = 0.0;
+static double g_lastKeepAwake = 0.0;
+// Time until we stop considering the core active without user input.
+// Should this be configurable?  2 hours currently.
+static const double ACTIVITY_IDLE_TIMEOUT = 2.0 * 3600.0;
 
 void System_ShowFileInFolder(const char *path) {
 	// SHParseDisplayName can't handle relative paths, so normalize first.
@@ -234,6 +241,8 @@ std::string System_GetProperty(SystemProperty prop) {
 			gpuDriverVersion = GetVideoCardDriverVersion();
 		}
 		return gpuDriverVersion;
+	case SYSPROP_BUILD_VERSION:
+		return PPSSPP_GIT_VERSION;
 	default:
 		return "";
 	}
@@ -353,10 +362,13 @@ bool System_GetPropertyBool(SystemProperty prop) {
 	case SYSPROP_HAS_FILE_BROWSER:
 	case SYSPROP_HAS_FOLDER_BROWSER:
 	case SYSPROP_HAS_OPEN_DIRECTORY:
+	case SYSPROP_HAS_TEXT_INPUT_DIALOG:
 		return true;
 	case SYSPROP_HAS_IMAGE_BROWSER:
 		return true;
 	case SYSPROP_HAS_BACK_BUTTON:
+		return true;
+	case SYSPROP_HAS_LOGIN_DIALOG:
 		return true;
 	case SYSPROP_APP_GOLD:
 #ifdef GOLD
@@ -370,6 +382,8 @@ bool System_GetPropertyBool(SystemProperty prop) {
 		return true;
 	case SYSPROP_SUPPORTS_OPEN_FILE_IN_EDITOR:
 		return true;  // FileUtil.cpp: OpenFileInEditor
+	case SYSPROP_SUPPORTS_HTTPS:
+		return true;
 	default:
 		return false;
 	}
@@ -437,6 +451,29 @@ void System_Notify(SystemNotification notification) {
 	case SystemNotification::TOGGLE_DEBUG_CONSOLE:
 		MainWindow::ToggleDebugConsoleVisibility();
 		break;
+
+	case SystemNotification::ACTIVITY:
+		g_lastActivity = time_now_d();
+		break;
+
+	case SystemNotification::KEEP_SCREEN_AWAKE:
+	{
+		// Keep the system awake for longer than normal for cutscenes and the like.
+		const double now = time_now_d();
+		if (now < g_lastActivity + ACTIVITY_IDLE_TIMEOUT) {
+			// Only resetting it ever prime number seconds in case the call is expensive.
+			// Using a prime number to ensure there's no interaction with other periodic events.
+			if (now - g_lastKeepAwake > 89.0 || now < g_lastKeepAwake) {
+				// Note that this needs to be called periodically.
+				// It's also possible to set ES_CONTINUOUS but let's not, for simplicity.
+#if defined(_WIN32) && !PPSSPP_PLATFORM(UWP)
+				SetThreadExecutionState(ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
+#endif
+				g_lastKeepAwake = now;
+			}
+		}
+		break;
+	}
 	}
 }
 
@@ -498,6 +535,17 @@ bool System_MakeRequest(SystemRequestType type, int requestId, const std::string
 			}
 		}).detach();
 		return true;
+	case SystemRequestType::ASK_USERNAME_PASSWORD:
+		std::thread([=] {
+			std::string username;
+			std::string password;
+			if (UserPasswordBox_GetStrings(MainWindow::GetHInstance(), MainWindow::GetHWND(), ConvertUTF8ToWString(param1).c_str(), &username, &password)) {
+				g_requestManager.PostSystemSuccess(requestId, (username + '\n' + password).c_str());
+			} else {
+				g_requestManager.PostSystemFailure(requestId);
+			}
+		}).detach();
+		return true;
 	case SystemRequestType::BROWSE_FOR_IMAGE:
 		std::thread([=] {
 			std::string out;
@@ -522,6 +570,9 @@ bool System_MakeRequest(SystemRequestType type, int requestId, const std::string
 			break;
 		case BrowseFileType::DB:
 			filter = MakeFilter(L"Cheat db files (*.db)|*.db|All files (*.*)|*.*||");
+			break;
+		case BrowseFileType::SOUND_EFFECT:
+			filter = MakeFilter(L"WAVE files (*.wav)|*.wav|All files (*.*)|*.*||");
 			break;
 		case BrowseFileType::ANY:
 			filter = MakeFilter(L"All files (*.*)|*.*||");

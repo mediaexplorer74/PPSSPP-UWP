@@ -320,7 +320,7 @@ struct JitLookup {
 // Collapse to less skinning shaders to reduce shader switching, which is expensive.
 int TranslateNumBones(int bones);
 
-typedef void(*JittedVertexDecoder)(const u8 *src, u8 *dst, int count);
+typedef void (*JittedVertexDecoder)(const u8 *src, u8 *dst, int count, const UVScale *uvScaleOffset);
 
 struct VertexDecoderOptions {
 	bool expandAllWeightsToFloat;
@@ -336,9 +336,9 @@ public:
 
 	u32 VertexType() const { return fmt_; }
 
-	const DecVtxFormat &GetDecVtxFmt() { return decFmt; }
+	const DecVtxFormat &GetDecVtxFmt() const { return decFmt; }
 
-	void DecodeVerts(u8 *decoded, const void *verts, int indexLowerBound, int indexUpperBound) const;
+	void DecodeVerts(u8 *decoded, const void *verts, const UVScale *uvScaleOffset, int indexLowerBound, int indexUpperBound) const;
 
 	int VertexSize() const { return size; }  // PSP format size
 
@@ -436,6 +436,7 @@ public:
 	// Mutable decoder state
 	mutable u8 *decoded_ = nullptr;
 	mutable const u8 *ptr_ = nullptr;
+	mutable const UVScale *prescaleUV_ = nullptr;
 	JittedVertexDecoder jitted_ = 0;
 	int32_t jittedSize_ = 0;
 
@@ -472,6 +473,9 @@ public:
 	u8 biggest;  // in practice, alignment.
 
 	friend class VertexDecoderJitCache;
+
+private:
+	void CompareToJit(const u8 *startPtr, u8 *decodedptr, int count, const UVScale *uvScaleOffset) const;
 };
 
 

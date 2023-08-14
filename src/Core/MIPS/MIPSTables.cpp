@@ -150,7 +150,7 @@ static const MIPSInstruction tableImmediate[64] = // xxxxxx ..... ..... ........
 	INSTR("swr", JITFUNC(Comp_ITypeMem), Dis_ITypeMem, Int_ITypeMem, IN_IMM16|IN_RS_ADDR|IN_RT|OUT_MEM|MEMTYPE_WORD),
 	INSTR("cache", JITFUNC(Comp_Cache), Dis_Cache, Int_Cache, IN_MEM|IN_IMM16|IN_RS_ADDR),
 	//48
-	INSTR("ll", JITFUNC(Comp_Generic), Dis_Generic, Int_StoreSync, IN_MEM|IN_IMM16|IN_RS_ADDR|OUT_RT|OUT_OTHER|MEMTYPE_WORD),
+	INSTR("ll", JITFUNC(Comp_StoreSync), Dis_ITypeMem, Int_StoreSync, IN_MEM|IN_IMM16|IN_RS_ADDR|OUT_RT|OUT_OTHER|MEMTYPE_WORD),
 	INSTR("lwc1", JITFUNC(Comp_FPULS), Dis_FPULS, Int_FPULS, IN_MEM|IN_IMM16|IN_RS_ADDR|OUT_FT|MEMTYPE_FLOAT|IS_FPU),
 	INSTR("lv.s", JITFUNC(Comp_SV), Dis_SV, Int_SV, IN_MEM|IN_IMM16|IN_RS_ADDR|OUT_OTHER|IS_VFPU|VFPU_NO_PREFIX|MEMTYPE_FLOAT),
 	INVALID,
@@ -159,7 +159,7 @@ static const MIPSInstruction tableImmediate[64] = // xxxxxx ..... ..... ........
 	INSTR("lv.q", JITFUNC(Comp_SVQ), Dis_SVQ, Int_SVQ, IN_MEM|IN_IMM16|IN_RS_ADDR|OUT_OTHER|IS_VFPU|VFPU_NO_PREFIX|MEMTYPE_VQUAD), //copU
 	ENCODING(VFPU5),
 	//56
-	INSTR("sc", JITFUNC(Comp_Generic), Dis_Generic, Int_StoreSync, IN_IMM16|IN_RS_ADDR|IN_OTHER|IN_RT|OUT_RT|OUT_MEM|MEMTYPE_WORD),
+	INSTR("sc", JITFUNC(Comp_StoreSync), Dis_ITypeMem, Int_StoreSync, IN_IMM16|IN_RS_ADDR|IN_OTHER|IN_RT|OUT_RT|OUT_MEM|MEMTYPE_WORD),
 	INSTR("swc1", JITFUNC(Comp_FPULS), Dis_FPULS, Int_FPULS, IN_IMM16|IN_RS_ADDR|IN_FT|OUT_MEM|MEMTYPE_FLOAT|IS_FPU), //copU
 	INSTR("sv.s", JITFUNC(Comp_SV), Dis_SV, Int_SV, IN_IMM16|IN_RS_ADDR|IN_OTHER|OUT_MEM|IS_VFPU|VFPU_NO_PREFIX|MEMTYPE_FLOAT),
 	INVALID,
@@ -918,14 +918,13 @@ void MIPSCompileOp(MIPSOpcode op, MIPSComp::MIPSFrontendInterface *jit) {
 	}
 }
 
-void MIPSDisAsm(MIPSOpcode op, u32 pc, char *out, bool tabsToSpaces) {
+void MIPSDisAsm(MIPSOpcode op, u32 pc, char *out, size_t outSize, bool tabsToSpaces) {
 	if (op == 0) {
-		strcpy(out, "nop");
+		truncate_cpy(out, outSize, "nop");
 	} else {
-		disPC = pc;
 		const MIPSInstruction *instr = MIPSGetInstruction(op);
 		if (instr && instr->disasm) {
-			instr->disasm(op, out);
+			instr->disasm(op, pc, out, outSize);
 			if (tabsToSpaces) {
 				while (*out) {
 					if (*out == '\t')
@@ -934,7 +933,7 @@ void MIPSDisAsm(MIPSOpcode op, u32 pc, char *out, bool tabsToSpaces) {
 				}
 			}
 		} else {
-			strcpy(out, "no instruction :(");
+			truncate_cpy(out, outSize, "no instruction :(");
 		}
 	}
 }
@@ -946,7 +945,7 @@ static inline void Interpret(const MIPSInstruction *instr, MIPSOpcode op) {
 		ERROR_LOG_REPORT(CPU, "Unknown instruction %08x at %08x", op.encoding, currentMIPS->pc);
 		// Try to disassemble it
 		char disasm[256];
-		MIPSDisAsm(op, currentMIPS->pc, disasm);
+		MIPSDisAsm(op, currentMIPS->pc, disasm, sizeof(disasm));
 		_dbg_assert_msg_(0, "%s", disasm);
 		currentMIPS->pc += 4;
 	}
@@ -1120,8 +1119,8 @@ int MIPSGetMemoryAccessSize(MIPSOpcode op) {
 	return 0;
 }
 
-const char *MIPSDisasmAt(u32 compilerPC) {
-	static char temp[256];
-	MIPSDisAsm(Memory::Read_Instruction(compilerPC), 0, temp);
+std::string MIPSDisasmAt(u32 compilerPC) {
+	char temp[512];
+	MIPSDisAsm(Memory::Read_Instruction(compilerPC), 0, temp, sizeof(temp));
 	return temp;
 }

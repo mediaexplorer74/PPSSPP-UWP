@@ -43,6 +43,7 @@
 #include "Common/TimeUtil.h"
 #include "Common/GraphicsContext.h"
 
+#include "Core/RetroAchievements.h"
 #include "Core/MemFault.h"
 #include "Core/HDRemaster.h"
 #include "Core/MIPS/MIPS.h"
@@ -72,6 +73,7 @@
 #include "GPU/GPUState.h"
 #include "GPU/GPUInterface.h"
 #include "GPU/Debugger/RecordFormat.h"
+#include "Core/RetroAchievements.h"
 
 enum CPUThreadState {
 	CPU_THREAD_NOT_RUNNING,
@@ -234,7 +236,7 @@ bool DiscIDFromGEDumpPath(const Path &path, FileLoader *fileLoader, std::string 
 	}
 }
 
-bool CPU_Init(std::string *errorString) {
+bool CPU_Init(std::string *errorString, FileLoader *loadedFile) {
 	coreState = CORE_POWERUP;
 	currentMIPS = &mipsr4k;
 
@@ -249,12 +251,6 @@ bool CPU_Init(std::string *errorString) {
 	Memory::g_PSPModel = g_Config.iPSPModel;
 
 	Path filename = g_CoreParameter.fileToStart;
-	loadedFile = ResolveFileLoaderTarget(ConstructFileLoader(filename));
-#if PPSSPP_ARCH(AMD64)
-	if (g_Config.bCacheFullIsoInRam) {
-		loadedFile = new RamCachingFileLoader(loadedFile);
-	}
-#endif
 
 	IdentifiedFileType type = Identify_File(loadedFile, errorString);
 
@@ -422,6 +418,10 @@ bool PSP_InitStart(const CoreParameter &coreParam, std::string *error_string) {
 		return false;
 	}
 
+	if (!Achievements::IsReadyToStart()) {
+		return false;
+	}
+
 #if defined(_WIN32) && PPSSPP_ARCH(AMD64)
 	NOTICE_LOG(BOOT, "PPSSPP %s Windows 64 bit", PPSSPP_GIT_VERSION);
 #elif defined(_WIN32) && !PPSSPP_ARCH(AMD64)
@@ -440,7 +440,17 @@ bool PSP_InitStart(const CoreParameter &coreParam, std::string *error_string) {
 	pspIsIniting = true;
 	PSP_SetLoading("Loading game...");
 
-	if (!CPU_Init(&g_CoreParameter.errorString)) {
+	Path filename = g_CoreParameter.fileToStart;
+	FileLoader *loadedFile = ResolveFileLoaderTarget(ConstructFileLoader(filename));
+#if PPSSPP_ARCH(AMD64)
+	if (g_Config.bCacheFullIsoInRam) {
+		loadedFile = new RamCachingFileLoader(loadedFile);
+	}
+#endif
+
+	Achievements::SetGame(filename, loadedFile);
+
+	if (!CPU_Init(&g_CoreParameter.errorString, loadedFile)) {
 		*error_string = g_CoreParameter.errorString;
 		if (error_string->empty()) {
 			*error_string = "Failed initializing CPU/Memory";
@@ -476,7 +486,10 @@ bool PSP_InitUpdate(std::string *error_string) {
 	}
 
 	bool success = !g_CoreParameter.fileToStart.empty();
-	*error_string = g_CoreParameter.errorString;
+	if (!g_CoreParameter.errorString.empty()) {
+		*error_string = g_CoreParameter.errorString;
+	}
+
 	if (success && gpu == nullptr) {
 		PSP_SetLoading("Starting graphics...");
 		Draw::DrawContext *draw = g_CoreParameter.graphicsContext ? g_CoreParameter.graphicsContext->GetDrawContext() : nullptr;
@@ -534,6 +547,8 @@ bool PSP_IsQuitting() {
 }
 
 void PSP_Shutdown() {
+	Achievements::UnloadGame();
+
 	// Do nothing if we never inited.
 	if (!pspIsInited && !pspIsIniting && !pspIsQuitting) {
 		return;

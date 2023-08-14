@@ -1,0 +1,1 @@
+#define PPSSPP_WIN_VERSION_COMMA 0,0,0,0 

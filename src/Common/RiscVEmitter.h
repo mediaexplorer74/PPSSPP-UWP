@@ -213,6 +213,19 @@ public:
 	bool BInRange(const void *func) const;
 	bool JInRange(const void *func) const;
 
+	void QuickJAL(RiscVReg scratchreg, RiscVReg rd, const u8 *dst);
+	void QuickJ(RiscVReg scratchreg, const u8 *dst) {
+		QuickJAL(scratchreg, R_ZERO, dst);
+	}
+	void QuickCallFunction(const u8 *func, RiscVReg scratchreg = R_RA) {
+		QuickJAL(scratchreg, R_RA, func);
+	}
+	template <typename T>
+	void QuickCallFunction(T *func, RiscVReg scratchreg = R_RA) {
+		static_assert(std::is_function<T>::value, "QuickCallFunction without function");
+		QuickCallFunction((const u8 *)func, scratchreg);
+	}
+
 	void LUI(RiscVReg rd, s32 simm32);
 	void AUIPC(RiscVReg rd, s32 simm32);
 
@@ -301,6 +314,12 @@ public:
 
 	void NEG(RiscVReg rd, RiscVReg rs) {
 		SUB(rd, R_ZERO, rs);
+	}
+	void SNEZ(RiscVReg rd, RiscVReg rs) {
+		SLTU(rd, R_ZERO, rs);
+	}
+	void SEQZ(RiscVReg rd, RiscVReg rs) {
+		SLTIU(rd, rs, 1);
 	}
 
 	void FENCE(Fence predecessor, Fence successor);
@@ -896,6 +915,9 @@ public:
 	void MINU(RiscVReg rd, RiscVReg rs1, RiscVReg rs2);
 	void SEXT_B(RiscVReg rd, RiscVReg rs);
 	void SEXT_H(RiscVReg rd, RiscVReg rs);
+	void SEXT_W(RiscVReg rd, RiscVReg rs) {
+		ADDIW(rd, rs, 0);
+	}
 	void ZEXT_H(RiscVReg rd, RiscVReg rs);
 	void ZEXT_W(RiscVReg rd, RiscVReg rs) {
 		ADD_UW(rd, rs, R_ZERO);

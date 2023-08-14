@@ -18,6 +18,7 @@
 #include "Windows/Debugger/Debugger_MemoryDlg.h"
 #include "Windows/Debugger/DebuggerShared.h"
 #include "Windows/Debugger/BreakpointWindow.h"
+#include "Windows/Debugger/EditSymbolsWindow.h"
 #include "Windows/main.h"
 
 #include "Common/CommonWindows.h"
@@ -302,7 +303,7 @@ void CtrlDisAsmView::assembleOpcode(u32 address, std::string defaultText)
 			{
 				for (int reg = 0; reg < debugger->GetNumRegsInCategory(cat); reg++)
 				{
-					if (strcasecmp(debugger->GetRegName(cat,reg),registerName.c_str()) == 0)
+					if (strcasecmp(debugger->GetRegName(cat,reg).c_str(), registerName.c_str()) == 0)
 					{
 						debugger->SetRegValue(cat,reg,value);
 						Reporting::NotifyDebugger();
@@ -977,6 +978,16 @@ void CtrlDisAsmView::onMouseUp(WPARAM wParam, LPARAM lParam, int button)
 		case ID_DISASM_NOPINSTRUCTION:
 			NopInstructions(selectRangeStart, selectRangeEnd);
 			redraw();
+			break;
+		case ID_DISASM_EDITSYMBOLS:
+			{
+				EditSymbolsWindow esw(wnd, debugger);
+				if (esw.exec()) {
+					esw.eval();
+					SendMessage(GetParent(wnd), WM_DEB_MAPLOADED, 0, 0);
+					redraw();
+				}
+			}
 			break;
 		case ID_DISASM_SETPCTOHERE:
 			debugger->setPC(curAddress);

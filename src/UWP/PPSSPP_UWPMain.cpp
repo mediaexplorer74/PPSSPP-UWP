@@ -57,9 +57,6 @@ PPSSPP_UWPMain *g_main;
 extern WindowsAudioBackend *winAudioBackend;
 std::string langRegion;
 std::list<std::unique_ptr<InputDevice>> g_input;
-
-// This item will be assigned by 'App.cpp' at 'App::OnActivated'
-LaunchItem launchItem;
  
 // TODO: Use Microsoft::WRL::ComPtr<> for D3D11 objects?
 // TODO: See https://github.com/Microsoft/Windows-universal-samples/tree/master/Samples/WindowsAudioSession for WASAPI with UWP
@@ -126,21 +123,28 @@ PPSSPP_UWPMain::PPSSPP_UWPMain(App ^app, const std::shared_ptr<DX::DeviceResourc
 	bool debugLogLevel = false;
  
 	g_Config.iGPUBackend = (int)GPUBackend::DIRECT3D11;
-	 
+	
 	if (debugLogLevel) {
 		LogManager::GetInstance()->SetAllLogLevels(LogTypes::LDEBUG);
 	}
-
-	const char *argv[2] = { "fake", nullptr };
-
-	std::string cacheFolder = ConvertWStringToUTF8(ApplicationData::Current->TemporaryFolder->Path->Data());
-
-	NativeInit(1, argv, "", "", cacheFolder.c_str());
 
 	// Set log file location
 	if (g_Config.bEnableLogging) {
 		LogManager::GetInstance()->ChangeFileLog(GetLogFile().c_str());
 	}
+
+	const char *argv[2] = { "fake", nullptr };
+	int argc = 1;
+	
+	std::string cacheFolder = ConvertWStringToUTF8(ApplicationData::Current->TemporaryFolder->Path->Data());
+
+	// 'PPSSPP_UWPMain' is getting called before 'OnActivated'
+	// this make detecting launch items on startup hard
+	// I think 'Init' process must be moved out and invoked from 'OnActivated' one time only
+	// currently launchItem will work fine but we cannot skip logo screen
+	// we should pass file path to 'argv' using 'GetLaunchItemPath(args)' 
+	// instead of depending on 'boot_filename' (LaunchItem.cpp)
+	NativeInit(argc, argv, "", "", cacheFolder.c_str());
 
 	NativeInitGraphics(ctx_.get());
 	NativeResized();
@@ -179,24 +183,9 @@ void PPSSPP_UWPMain::CreateWindowSizeDependentResources() {
 	ctx_->GetDrawContext()->HandleEvent(Draw::Event::GOT_BACKBUFFER, width, height, m_deviceResources->GetBackBufferRenderTargetView());
 }
 
-void PPSSPP_UWPMain::BootToLaunchFile() {
-	if (launchItem.IsValid() && !launchItem.IsHandled()) {
-		launchItem.SetState(true);
-		std::string path = launchItem.GetFilePath();
-		if (!path.empty()) {
-			NativeMessageReceived("boot", path.c_str());
-		}
-	}
-}
 // Renders the current frame according to the current application state.
 // Returns true if the frame was rendered and is ready to be displayed.
 bool PPSSPP_UWPMain::Render() {
-	ctx_->GetDrawContext()->HandleEvent(Draw::Event::PRESENTED, 0, 0, nullptr, nullptr);
-	NativeUpdate();
-
-	// This is not perfect but it will do the job
-	BootToLaunchFile();
-
 	static bool hasSetThreadName = false;
 	if (!hasSetThreadName) {
 		SetCurrentThreadName("UWPRenderThread");
@@ -242,7 +231,7 @@ bool PPSSPP_UWPMain::Render() {
 
 	context->RSSetViewports(1, &viewport);
 
-	NativeRender(ctx_.get());
+	NativeFrame(ctx_.get());
 	return true;
 }
 
@@ -281,7 +270,7 @@ void PPSSPP_UWPMain::OnKeyUp(int scanCode, Windows::System::VirtualKey virtualKe
 }
 
 void PPSSPP_UWPMain::OnMouseWheel(float delta) {
-	int key = NKCODE_EXT_MOUSEWHEEL_UP;
+	InputKeyCode key = NKCODE_EXT_MOUSEWHEEL_UP;
 	if (delta < 0) {
 		key = NKCODE_EXT_MOUSEWHEEL_DOWN;
 	} else if (delta == 0) {
@@ -347,17 +336,13 @@ UWPGraphicsContext::UWPGraphicsContext(std::shared_ptr<DX::DeviceResources> reso
 	std::vector<std::string> adapterNames;
 
 	draw_ = Draw::T3DCreateD3D11Context(
-		resources->GetD3DDevice(), resources->GetD3DDeviceContext(), resources->GetD3DDevice(), resources->GetD3DDeviceContext(), resources->GetDeviceFeatureLevel(), 0, adapterNames);
+		resources->GetD3DDevice(), resources->GetD3DDeviceContext(), resources->GetD3DDevice(), resources->GetD3DDeviceContext(), resources->GetSwapChain(), resources->GetDeviceFeatureLevel(), 0, adapterNames, g_Config.iInflightFrames);
 	bool success = draw_->CreatePresets();
 	_assert_(success);
 }
 
 void UWPGraphicsContext::Shutdown() {
 	delete draw_;
-}
-
-void UWPGraphicsContext::SwapInterval(int interval) {
-
 }
 
 std::string System_GetProperty(SystemProperty prop) {
@@ -377,6 +362,8 @@ std::string System_GetProperty(SystemProperty prop) {
 		return "";
 	case SYSPROP_GPUDRIVER_VERSION:
 		return "";
+	case SYSPROP_BUILD_VERSION:
+		return PPSSPP_GIT_VERSION;
 	default:
 		return "";
 	}
@@ -547,6 +534,9 @@ bool System_MakeRequest(SystemRequestType type, int requestId, const std::string
 		case BrowseFileType::DB:
 			supportedExtensions = { ".db" };
 			break;
+		case BrowseFileType::SOUND_EFFECT:
+			supportedExtensions = { ".wav" };
+			break;
 		case BrowseFileType::ANY:
 			// 'ChooseFile' will added '*' by default when there are no extensions assigned
 			break;
@@ -582,9 +572,7 @@ bool System_MakeRequest(SystemRequestType type, int requestId, const std::string
 	case SystemRequestType::NOTIFY_UI_STATE:
 	{
 		if (!param1.empty() && !strcmp(param1.c_str(), "menu")) {
-			if (launchItem.IsValid() && launchItem.IsHandled()) {
-				launchItem.Close();
-			}
+			CloseLaunchItem();
 		}
 		return true;
 	}

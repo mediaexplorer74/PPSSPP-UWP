@@ -102,7 +102,7 @@ bool GameManager::DownloadAndInstall(std::string storeFileUrl) {
 
 	Path filename = GetTempFilename();
 	const char *acceptMime = "application/zip, application/x-cso, application/x-iso9660-image, application/octet-stream; q=0.9, */*; q=0.8";
-	curDownload_ = g_DownloadManager.StartDownload(storeFileUrl, filename, acceptMime);
+	curDownload_ = g_DownloadManager.StartDownload(storeFileUrl, filename, http::ProgressBarMode::VISIBLE, acceptMime);
 	return true;
 }
 
@@ -310,7 +310,7 @@ bool GameManager::InstallGame(Path url, Path fileName, bool deleteAfter) {
 
 	struct zip *z = ZipOpenPath(fileName);
 	if (!z) {
-		installInProgress_ = false;
+		SetInstallError(sy->T("Unable to open zip file"));
 		return false;
 	}
 
@@ -742,6 +742,6 @@ void GameManager::ResetInstallError() {
 }
 
 void GameManager::InstallDone() {
-	installInProgress_ = false;
 	installDonePending_ = true;
+	installInProgress_ = false;
 }

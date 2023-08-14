@@ -4,6 +4,12 @@
 #include "Common/Log.h"
 #include "Common/StringUtils.h"
 
+#if 0 // def _DEBUG
+#define VLOG(...) NOTICE_LOG(G3D, __VA_ARGS__)
+#else
+#define VLOG(...)
+#endif
+
 void CachedReadback::Destroy(VulkanContext *vulkan) {
 	if (buffer) {
 		vulkan->Delete().QueueDeleteBufferAllocation(buffer, allocation);
@@ -104,6 +110,22 @@ VkResult FrameData::QueuePresent(VulkanContext *vulkan, FrameDataShared &shared)
 	present.pWaitSemaphores = &shared.renderingCompleteSemaphore;
 	present.waitSemaphoreCount = 1;
 
+	// Can't move these into the if.
+	VkPresentIdKHR presentID{ VK_STRUCTURE_TYPE_PRESENT_ID_KHR };
+	VkPresentTimesInfoGOOGLE presentGOOGLE{ VK_STRUCTURE_TYPE_PRESENT_TIMES_INFO_GOOGLE };
+
+	uint64_t frameId = this->frameId;
+	VkPresentTimeGOOGLE presentTimeGOOGLE{ (uint32_t)frameId, 0 };  // it's ok to truncate this. it'll wrap around and work (if we ever reach 4 billion frames..)
+	if (vulkan->Extensions().KHR_present_id && vulkan->GetDeviceFeatures().enabled.presentId.presentId) {
+		presentID.pPresentIds = &frameId;
+		presentID.swapchainCount = 1;
+		present.pNext = &presentID;
+	} else if (vulkan->Extensions().GOOGLE_display_timing) {
+		presentGOOGLE.pTimes = &presentTimeGOOGLE;
+		presentGOOGLE.swapchainCount = 1;
+		present.pNext = &presentGOOGLE;
+	}
+
 	return vkQueuePresentKHR(vulkan->GetGraphicsQueue(), &present);
 }
 
@@ -121,7 +143,7 @@ VkCommandBuffer FrameData::GetInitCmd(VulkanContext *vulkan) {
 		}
 
 		// Good spot to reset the query pool.
-		if (profilingEnabled_) {
+		if (profile.enabled) {
 			vkCmdResetQueryPool(initCmd, profile.queryPool, 0, MAX_TIMESTAMP_QUERIES);
 			vkCmdWriteTimestamp(initCmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, profile.queryPool, 0);
 		}
@@ -138,7 +160,7 @@ void FrameData::SubmitPending(VulkanContext *vulkan, FrameSubmitType type, Frame
 	VkFence fenceToTrigger = VK_NULL_HANDLE;
 
 	if (hasInitCommands) {
-		if (profilingEnabled_) {
+		if (profile.enabled) {
 			// Pre-allocated query ID 1 - end of init cmdbuf.
 			vkCmdWriteTimestamp(initCmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, profile.queryPool, 1);
 		}
@@ -196,12 +218,16 @@ void FrameData::SubmitPending(VulkanContext *vulkan, FrameSubmitType type, Frame
 
 	VkResult res;
 	if (fenceToTrigger == fence) {
+		VLOG("Doing queue submit, fencing frame %d", this->index);
 		// The fence is waited on by the main thread, they are not allowed to access it simultaneously.
 		res = vkQueueSubmit(vulkan->GetGraphicsQueue(), 1, &submit_info, fenceToTrigger);
-		std::lock_guard<std::mutex> lock(fenceMutex);
-		readyForFence = true;
-		fenceCondVar.notify_one();
+		if (sharedData.useMultiThreading) {
+			std::lock_guard<std::mutex> lock(fenceMutex);
+			readyForFence = true;
+			fenceCondVar.notify_one();
+		}
 	} else {
+		VLOG("Doing queue submit, fencing something (%p)", fenceToTrigger);
 		res = vkQueueSubmit(vulkan->GetGraphicsQueue(), 1, &submit_info, fenceToTrigger);
 	}
 
@@ -219,7 +245,7 @@ void FrameData::SubmitPending(VulkanContext *vulkan, FrameSubmitType type, Frame
 	}
 }
 
-void FrameDataShared::Init(VulkanContext *vulkan) {
+void FrameDataShared::Init(VulkanContext *vulkan, bool useMultiThreading) {
 	VkSemaphoreCreateInfo semaphoreCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
 	semaphoreCreateInfo.flags = 0;
 	VkResult res = vkCreateSemaphore(vulkan->GetDevice(), &semaphoreCreateInfo, nullptr, &acquireSemaphore);
@@ -230,6 +256,8 @@ void FrameDataShared::Init(VulkanContext *vulkan) {
 	// This fence is used for synchronizing readbacks. Does not need preinitialization.
 	readbackFence = vulkan->CreateFence(false);
 	vulkan->SetDebugName(readbackFence, VK_OBJECT_TYPE_FENCE, "readbackFence");
+
+	this->useMultiThreading = useMultiThreading;
 }
 
 void FrameDataShared::Destroy(VulkanContext *vulkan) {

@@ -359,7 +359,7 @@ protected:
 
 class RefCountedObject {
 public:
-	RefCountedObject() {
+	explicit RefCountedObject(const char *name) : name_(name) {
 		refcount_ = 1;
 	}
 	RefCountedObject(const RefCountedObject &other) = delete;
@@ -372,6 +372,7 @@ public:
 
 private:
 	std::atomic<int> refcount_;
+	const char * const name_;
 };
 
 template <typename T>
@@ -428,18 +429,22 @@ struct AutoRef {
 
 class BlendState : public RefCountedObject {
 public:
+	BlendState() : RefCountedObject("BlendState") {}
 };
 
 class SamplerState : public RefCountedObject {
 public:
+	SamplerState() : RefCountedObject("SamplerState") {}
 };
 
 class DepthStencilState : public RefCountedObject {
 public:
+	DepthStencilState() : RefCountedObject("DepthStencilState") {}
 };
 
 class Framebuffer : public RefCountedObject {
 public:
+	Framebuffer() : RefCountedObject("Framebuffer") {}
 	int Width() { return width_; }
 	int Height() { return height_; }
 	int Layers() { return layers_; }
@@ -452,15 +457,20 @@ protected:
 
 class Buffer : public RefCountedObject {
 public:
+	Buffer() : RefCountedObject("Buffer") {}
 };
 
 class Texture : public RefCountedObject {
 public:
-	int Width() { return width_; }
-	int Height() { return height_; }
-	int Depth() { return depth_; }
+	Texture() : RefCountedObject("Texture") {}
+	int Width() const { return width_; }
+	int Height() const { return height_; }
+	int Depth() const { return depth_; }
+	DataFormat Format() const { return format_; }
+
 protected:
 	int width_ = -1, height_ = -1, depth_ = -1;
+	DataFormat format_ = DataFormat::UNDEFINED;
 };
 
 struct BindingDesc {
@@ -480,18 +490,28 @@ struct InputLayoutDesc {
 	std::vector<AttributeDesc> attributes;
 };
 
-class InputLayout : public RefCountedObject { };
+class InputLayout : public RefCountedObject {
+public:
+	InputLayout() : RefCountedObject("InputLayout") {}
+};
 
 // Uniform types have moved to Shader.h.
 
 class ShaderModule : public RefCountedObject {
 public:
+	ShaderModule() : RefCountedObject("ShaderModule") {}
 	virtual ShaderStage GetStage() const = 0;
 };
 
-class Pipeline : public RefCountedObject { };
+class Pipeline : public RefCountedObject {
+public:
+	Pipeline() : RefCountedObject("Pipeline") {}
+};
 
-class RasterState : public RefCountedObject {};
+class RasterState : public RefCountedObject {
+public:
+	RasterState() : RefCountedObject("RasterState") {}
+};
 
 struct StencilSetup {
 	StencilOp failOp;
@@ -583,6 +603,8 @@ struct DeviceCaps {
 	bool multiViewSupported;
 	bool isTilingGPU;  // This means that it benefits from correct store-ops, msaa without backing memory, etc.
 	bool sampleRateShadingSupported;
+	bool setMaxFrameLatencySupported;
+	bool textureSwizzleSupported;
 
 	bool verySlowShaderCompiler;
 
@@ -671,7 +693,7 @@ public:
 	virtual const DeviceCaps &GetDeviceCaps() const = 0;
 	virtual uint32_t GetDataFormatSupport(DataFormat fmt) const = 0;
 	virtual std::vector<std::string> GetFeatureList() const { return std::vector<std::string>(); }
-	virtual std::vector<std::string> GetExtensionList() const { return std::vector<std::string>(); }
+	virtual std::vector<std::string> GetExtensionList(bool device, bool enabledOnly) const { return std::vector<std::string>(); }
 	virtual std::vector<std::string> GetDeviceList() const { return std::vector<std::string>(); }
 
 	virtual PresentationMode GetPresentationMode() const = 0;
@@ -686,7 +708,6 @@ public:
 	virtual void SetErrorCallback(ErrorCallbackFn callback, void *userdata) {}
 
 	virtual void DebugAnnotate(const char *annotation) {}
-	virtual void SetDebugFlags(DebugFlags flags) {}
 
 	// Partial pipeline state, used to create pipelines. (in practice, in d3d11 they'll use the native state objects directly).
 	// TODO: Possibly ditch these and just put the descs directly in PipelineDesc since only D3D11 benefits.
@@ -712,6 +733,11 @@ public:
 
 	// Copies data from the CPU over into the buffer, at a specific offset. This does not change the size of the buffer and cannot write outside it.
 	virtual void UpdateBuffer(Buffer *buffer, const uint8_t *data, size_t offset, size_t size, UpdateBufferFlags flags) = 0;
+
+	// Used to optimize DrawPixels by re-using previously allocated temp textures.
+	// Do not try to update a texture that might be used by an in-flight command buffer! In OpenGL and D3D, this will cause stalls
+	// while in Vulkan this might cause various strangeness like image corruption.
+	virtual void UpdateTextureLevels(Texture *texture, const uint8_t **data, TextureCallback initDataCallback, int numLevels) = 0;
 
 	virtual void CopyFramebufferImage(Framebuffer *src, int level, int x, int y, int z, Framebuffer *dst, int dstLevel, int dstX, int dstY, int dstZ, int width, int height, int depth, int channelBits, const char *tag) = 0;
 	virtual bool BlitFramebuffer(Framebuffer *src, int srcX1, int srcY1, int srcX2, int srcY2, Framebuffer *dst, int dstX1, int dstY1, int dstX2, int dstY2, int channelBits, FBBlitFilter filter, const char *tag) = 0;
@@ -787,8 +813,10 @@ public:
 	virtual void DrawUP(const void *vdata, int vertexCount) = 0;
 	
 	// Frame management (for the purposes of sync and resource management, necessary with modern APIs). Default implementations here.
-	virtual void BeginFrame() {}
+	virtual void BeginFrame(DebugFlags debugFlags) {}
 	virtual void EndFrame() = 0;
+	virtual void Present(int vblanks) = 0;  // NOTE: Not all backends support vblanks > 1.
+
 	virtual void WipeQueue() {}
 
 	// This should be avoided as much as possible, in favor of clearing when binding a render target, which is native
@@ -815,6 +843,17 @@ public:
 	// Used by the DrawEngines to know when they have to re-apply some state.
 	// Not very elegant, but more elegant than the old passId hack.
 	virtual void SetInvalidationCallback(InvalidationCallback callback) = 0;
+
+	// Total amount of frames rendered. Unaffected by game pause, so more robust than gpuStats.numFlips
+	virtual int GetFrameCount() = 0;
+
+	virtual FrameTimeData GetFrameTimeData(int framesBack) const {
+		return FrameTimeData{};
+	}
+
+	virtual std::string GetGpuProfileString() const {
+		return "";
+	}
 
 protected:
 	ShaderModule *vsPresets_[VS_MAX_PRESET];

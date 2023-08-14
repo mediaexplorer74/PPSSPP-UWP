@@ -152,7 +152,9 @@ public:
 
 	void NotifyRenderResized() override;
 	void NotifyDisplayResized() override;
-	void NotifyConfigChanged() override;
+
+	void CheckDisplayResized() override;
+	void CheckConfigChanged() override;
 
 	void GetReportingInfo(std::string &primaryInfo, std::string &fullInfo) override {
 		primaryInfo = "Software";
@@ -184,6 +186,9 @@ public:
 
 	// Overridden to change flushing behavior.
 	void Execute_Call(u32 op, u32 diff);
+
+	// Overridden for a dirty flag change.
+	void Execute_BoundingBox(u32 op, u32 diff);
 
 	void Execute_WorldMtxNum(u32 op, u32 diff);
 	void Execute_ViewMtxNum(u32 op, u32 diff);

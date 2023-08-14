@@ -1,5 +1,6 @@
 #include <algorithm>
 #include "Common/System/Display.h"
+#include "Common/System/System.h"
 #include "Common/Input/InputState.h"
 #include "Common/Input/KeyCodes.h"
 #include "Common/Math/curves.h"
@@ -9,7 +10,6 @@
 #include "Common/UI/Root.h"
 #include "Common/Data/Text/I18n.h"
 #include "Common/Render/DrawBuffer.h"
-
 #include "Common/Log.h"
 
 static const bool ClickDebug = false;
@@ -60,6 +60,75 @@ void UIScreen::DoRecreateViews() {
 	}
 }
 
+void UIScreen::touch(const TouchInput &touch) {
+	if (!ignoreInput_ && root_) {
+		UI::TouchEvent(touch, root_);
+	}
+}
+
+void UIScreen::axis(const AxisInput &axis) {
+	if (!ignoreInput_ && root_) {
+		UI::AxisEvent(axis, root_);
+	}
+}
+
+bool UIScreen::key(const KeyInput &key) {
+	if (!ignoreInput_ && root_) {
+		return UI::KeyEvent(key, root_);
+	} else {
+		return false;
+	}
+}
+
+void UIScreen::UnsyncTouch(const TouchInput &touch) {
+	if (ClickDebug && root_ && (touch.flags & TOUCH_DOWN)) {
+		INFO_LOG(SYSTEM, "Touch down!");
+		std::vector<UI::View *> views;
+		root_->Query(touch.x, touch.y, views);
+		for (auto view : views) {
+			INFO_LOG(SYSTEM, "%s", view->DescribeLog().c_str());
+		}
+	}
+
+	std::lock_guard<std::mutex> guard(eventQueueLock_);
+	QueuedEvent ev{};
+	ev.type = QueuedEventType::TOUCH;
+	ev.touch = touch;
+	eventQueue_.push_back(ev);
+}
+
+void UIScreen::UnsyncAxis(const AxisInput &axis) {
+	std::lock_guard<std::mutex> guard(eventQueueLock_);
+	QueuedEvent ev{};
+	ev.type = QueuedEventType::AXIS;
+	ev.axis = axis;
+	eventQueue_.push_back(ev);
+}
+
+bool UIScreen::UnsyncKey(const KeyInput &key) {
+	bool retval = false;
+	if (root_) {
+		// TODO: Make key events async too. The return value is troublesome, though.
+		switch (UI::UnsyncKeyEvent(key, root_)) {
+		case UI::KeyEventResult::ACCEPT:
+			retval = true;
+			break;
+		case UI::KeyEventResult::PASS_THROUGH:
+			retval = false;
+			break;
+		case UI::KeyEventResult::IGNORE_KEY:
+			return false;
+		}
+	}
+
+	std::lock_guard<std::mutex> guard(eventQueueLock_);
+	QueuedEvent ev{};
+	ev.type = QueuedEventType::KEY;
+	ev.key = key;
+	eventQueue_.push_back(ev);
+	return retval;
+}
+
 void UIScreen::update() {
 	bool vertical = UseVerticalLayout();
 	if (vertical != lastVertical_) {
@@ -71,6 +140,41 @@ void UIScreen::update() {
 
 	if (root_) {
 		UpdateViewHierarchy(root_);
+	}
+
+	while (true) {
+		QueuedEvent ev{};
+		{
+			std::lock_guard<std::mutex> guard(eventQueueLock_);
+			if (!eventQueue_.empty()) {
+				ev = eventQueue_.front();
+				eventQueue_.pop_front();
+			} else {
+				break;
+			}
+		}
+		if (ignoreInput_) {
+			continue;
+		}
+		switch (ev.type) {
+		case QueuedEventType::KEY:
+			key(ev.key);
+			break;
+		case QueuedEventType::TOUCH:
+			if (ClickDebug && (ev.touch.flags & TOUCH_DOWN)) {
+				INFO_LOG(SYSTEM, "Touch down!");
+				std::vector<UI::View *> views;
+				root_->Query(ev.touch.x, ev.touch.y, views);
+				for (auto view : views) {
+					INFO_LOG(SYSTEM, "%s", view->DescribeLog().c_str());
+				}
+			}
+			touch(ev.touch);
+			break;
+		case QueuedEventType::AXIS:
+			axis(ev.axis);
+			break;
+		}
 	}
 }
 
@@ -87,10 +191,7 @@ void UIScreen::deviceRestored() {
 void UIScreen::preRender() {
 	using namespace Draw;
 	Draw::DrawContext *draw = screenManager()->getDrawContext();
-	if (!draw) {
-		return;
-	}
-	draw->BeginFrame();
+	_dbg_assert_(draw != nullptr);
 	// Bind and clear the back buffer
 	draw->BindFramebufferAsRenderTarget(nullptr, { RPAction::CLEAR, RPAction::CLEAR, RPAction::CLEAR, 0xFF000000 }, "UI");
 	screenManager()->getUIContext()->BeginFrame();
@@ -107,11 +208,7 @@ void UIScreen::preRender() {
 }
 
 void UIScreen::postRender() {
-	Draw::DrawContext *draw = screenManager()->getDrawContext();
-	if (!draw) {
-		return;
-	}
-	draw->EndFrame();
+	screenManager()->getUIContext()->Flush();
 }
 
 void UIScreen::render() {
@@ -147,29 +244,9 @@ TouchInput UIScreen::transformTouch(const TouchInput &touch) {
 	return updated;
 }
 
-void UIScreen::touch(const TouchInput &touch) {
-	if (root_) {
-		if (ClickDebug && (touch.flags & TOUCH_DOWN)) {
-			INFO_LOG(SYSTEM, "Touch down!");
-			std::vector<UI::View *> views;
-			root_->Query(touch.x, touch.y, views);
-			for (auto view : views) {
-				INFO_LOG(SYSTEM, "%s", view->DescribeLog().c_str());
-			}
-		}
-
-		UI::TouchEvent(touch, root_);
-	}
-}
-
-bool UIScreen::key(const KeyInput &key) {
-	if (root_) {
-		return UI::KeyEvent(key, root_);
-	}
-	return false;
-}
-
 void UIScreen::TriggerFinish(DialogResult result) {
+	// From here on, this dialog cannot receive input.
+	ignoreInput_ = true;
 	screenManager()->finishDialog(this, result);
 }
 
@@ -192,12 +269,6 @@ void UIDialogScreen::sendMessage(const char *msg, const char *value) {
 	Screen *screen = screenManager()->dialogParent(this);
 	if (screen) {
 		screen->sendMessage(msg, value);
-	}
-}
-
-void UIScreen::axis(const AxisInput &axis) {
-	if (root_) {
-		UI::AxisEvent(axis, root_);
 	}
 }
 
@@ -312,6 +383,7 @@ void PopupScreen::SetPopupOffset(float y) {
 
 void PopupScreen::TriggerFinish(DialogResult result) {
 	if (CanComplete(result)) {
+		ignoreInput_ = true;
 		finishFrame_ = frames_;
 		finishResult_ = result;
 
@@ -346,7 +418,6 @@ void PopupScreen::CreateViews() {
 
 	CreatePopupContents(box_);
 	root_->SetDefaultFocusView(box_);
-
 	if (ShowButtons() && !button1_.empty()) {
 		// And the two buttons at the bottom.
 		LinearLayout *buttonRow = new LinearLayout(ORIENT_HORIZONTAL, new LinearLayoutParams(200, WRAP_CONTENT));

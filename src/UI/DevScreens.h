@@ -24,7 +24,7 @@
 #include "Common/Data/Text/I18n.h"
 #include "Common/Net/HTTPClient.h"
 #include "Common/UI/UIScreen.h"
-
+#include "UI/TabbedDialogScreen.h"
 #include "UI/MiscScreens.h"
 #include "GPU/Common/ShaderCommon.h"
 
@@ -42,8 +42,6 @@ protected:
 	UI::EventReturn OnLogConfig(UI::EventParams &e);
 	UI::EventReturn OnJitCompare(UI::EventParams &e);
 	UI::EventReturn OnShaderView(UI::EventParams &e);
-	UI::EventReturn OnFreezeFrame(UI::EventParams &e);
-	UI::EventReturn OnDumpFrame(UI::EventParams &e);
 	UI::EventReturn OnDeveloperTools(UI::EventParams &e);
 	UI::EventReturn OnResetLimitedLogging(UI::EventParams &e);
 
@@ -105,13 +103,18 @@ private:
 	void OnCompleted(DialogResult result) override;
 };
 
-class SystemInfoScreen : public UIDialogScreenWithGameBackground {
+class SystemInfoScreen : public TabbedUIDialogScreenWithGameBackground {
 public:
-	SystemInfoScreen(const Path &filename) : UIDialogScreenWithGameBackground(filename) {}
+	SystemInfoScreen(const Path &filename) : TabbedUIDialogScreenWithGameBackground(filename) {}
 
 	const char *tag() const override { return "SystemInfo"; }
 
-	void CreateViews() override;
+	void CreateTabs() override;
+
+	void update() override;
+
+protected:
+	bool ShowSearchControls() const override { return false; }
 };
 
 class AddressPromptScreen : public PopupScreen {
@@ -215,9 +218,11 @@ private:
 	UI::EventReturn OnLoadDump(UI::EventParams &e);
 
 	std::vector<std::string> files_;
-	std::shared_ptr<http::Download> listing_;
-	std::shared_ptr<http::Download> dumpDownload_;
+	std::shared_ptr<http::Request> listing_;
+	std::shared_ptr<http::Request> dumpDownload_;
 };
 
 void DrawProfile(UIContext &ui);
 const char *GetCompilerABI();
+
+void AddOverlayList(UI::ViewGroup *items, ScreenManager *screenManager);

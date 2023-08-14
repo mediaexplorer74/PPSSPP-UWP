@@ -29,20 +29,9 @@
 
 extern const char *PPSSPP_GIT_VERSION;
 
-enum ChatPositions {
-	BOTTOM_LEFT = 0,
-	BOTTOM_CENTER = 1,
-	BOTOM_RIGHT = 2,
-	TOP_LEFT = 3,
-	TOP_CENTER = 4,
-	TOP_RIGHT = 5,
-	CENTER_LEFT = 6,
-	CENTER_RIGHT = 7,
-};
-
 namespace http {
-	class Download;
-	class Downloader;
+	class Request;
+	class RequestManager;
 }
 
 struct UrlEncoder;
@@ -238,6 +227,7 @@ public:
 	bool bGfxDebugOutput;
 	int iInflightFrames;
 	bool bRenderDuplicateFrames;
+	bool bRenderMultiThreading;
 
 	// Sound
 	bool bEnableSound;
@@ -263,10 +253,6 @@ public:
 
 	// These aren't saved, just for instant debugging.
 	bool bLogFrameDrops;
-	bool bShowDebugStats;
-	bool bShowAudioDebug;
-	bool bShowControlDebug;
-	bool bShowGpuProfile;
 
 	// Analog stick tilting
 	// This is the held base angle (from the horizon), that we compute the tilt relative from.
@@ -279,6 +265,8 @@ public:
 	int iTiltSensitivityY;
 	// The deadzone radius of the tilt. Only used in the analog mapping.
 	float fTiltAnalogDeadzoneRadius;
+	float fTiltInverseDeadzone;  // An inverse deadzone for the output, counteracting excessive deadzones applied by games. See #17483.
+	bool bTiltCircularInverseDeadzone;
 	// Type of tilt input currently selected: Defined in TiltEventProcessor.h
 	// 0 - no tilt, 1 - analog stick, 2 - D-Pad, 3 - Action Buttons (Tri, Cross, Square, Circle)
 	int iTiltInputType;
@@ -339,16 +327,9 @@ public:
 	ConfigTouchPos touchAnalogStick;
 	ConfigTouchPos touchRightAnalogStick;
 
-	ConfigTouchPos touchCustom0;
-	ConfigTouchPos touchCustom1;
-	ConfigTouchPos touchCustom2;
-	ConfigTouchPos touchCustom3;
-	ConfigTouchPos touchCustom4;
-	ConfigTouchPos touchCustom5;
-	ConfigTouchPos touchCustom6;
-	ConfigTouchPos touchCustom7;
-	ConfigTouchPos touchCustom8;
-	ConfigTouchPos touchCustom9;
+	enum { CUSTOM_BUTTON_COUNT = 20 };
+
+	ConfigTouchPos touchCustom[CUSTOM_BUTTON_COUNT];
 
 	float fLeftStickHeadScale;
 	float fRightStickHeadScale;
@@ -362,16 +343,7 @@ public:
 	bool bShowTouchTriangle;
 	bool bShowTouchSquare;
 
-	ConfigCustomButton CustomButton0;
-	ConfigCustomButton CustomButton1;
-	ConfigCustomButton CustomButton2;
-	ConfigCustomButton CustomButton3;
-	ConfigCustomButton CustomButton4;
-	ConfigCustomButton CustomButton5;
-	ConfigCustomButton CustomButton6;
-	ConfigCustomButton CustomButton7;
-	ConfigCustomButton CustomButton8;
-	ConfigCustomButton CustomButton9;
+	ConfigCustomButton CustomButton[CUSTOM_BUTTON_COUNT];
 
 	// Ignored on iOS and other platforms that lack pause.
 	bool bShowTouchPause;
@@ -390,6 +362,9 @@ public:
 	// Sets up how much the analog limiter button restricts digital->analog input.
 	float fAnalogLimiterDeadzone;
 
+	// Sets whether combo mapping is enabled.
+	bool bAllowMappingCombos;
+
 	bool bMouseControl;
 	bool bMapMouse; // Workaround for mapping screen:|
 	bool bMouseConfine; // Trap inside the window.
@@ -397,6 +372,10 @@ public:
 	float fMouseSmoothing;
 
 	bool bSystemControls;
+	int iRapidFireInterval;
+
+	// Use the hardware scaler to scale up the image to save fillrate. Similar to Windows' window size, really.
+	int iAndroidHwScale;  // 0 = device resolution. 1 = 480x272 (extended to correct aspect), 2 = 960x544 etc.
 
 	// Risky JIT optimizations
 	bool bDiscardRegsOnJRRA;
@@ -448,11 +427,13 @@ public:
 	bool bEnableMotions;
 	bool bForce72Hz;
 	bool bManualForceVR;
+	bool bPassthrough;
 	bool bRescaleHUD;
 	float fCameraDistance;
 	float fCameraHeight;
 	float fCameraSide;
 	float fCanvasDistance;
+	float fCanvas3DDistance;
 	float fFieldOfViewPercentage;
 	float fHeadUpDisplayScale;
 	float fMotionLength;
@@ -480,16 +461,45 @@ public:
 	bool bDisplayStatusBar;
 	bool bShowBottomTabTitles;
 	bool bShowDeveloperMenu;
-	bool bShowAllocatorDebug;
+
 	// Double edged sword: much easier debugging, but not accurate.
 	bool bSkipDeadbeefFilling;
+
 	bool bFuncHashMap;
+	std::string sSkipFuncHashMap;
 	bool bDebugMemInfoDetailed;
-	bool bDrawFrameGraph;
 
 	// Volatile development settings
-	bool bShowFrameProfiler;
+	// Overlays
+	int iDebugOverlay;
+
 	bool bGpuLogProfiler; // Controls the Vulkan logging profiler (profiles textures uploads etc).
+
+	// Retro Achievement settings
+	// Copied from Duckstation, we might want to remove some.
+	bool bAchievementsEnable;
+	bool bAchievementsChallengeMode;
+	bool bAchievementsEncoreMode;
+	bool bAchievementsUnofficial;
+	bool bAchievementsSoundEffects;
+	bool bAchievementsLogBadMemReads;
+
+	// Positioning of the various notifications
+	int iAchievementsLeaderboardTrackerPos;
+	int iAchievementsLeaderboardStartedOrFailedPos;
+	int iAchievementsLeaderboardSubmittedPos;
+	int iAchievementsProgressPos;
+	int iAchievementsChallengePos;
+	int iAchievementsUnlockedPos;
+
+	// Customizations
+	std::string sAchievementsUnlockAudioFile;
+	std::string sAchievementsLeaderboardSubmitAudioFile;
+
+	// Achivements login info. Note that password is NOT stored, only a login token.
+	// Still, we may wanna store it more securely than in PPSSPP.ini, especially on Android.
+	std::string sAchievementsUserName;
+	std::string sAchievementsToken;  // Not saved, to be used if you want to manually make your RA login persistent. See Native_SaveSecret for the normal case.
 
 	// Various directories. Autoconfigured, not read from ini.
 	Path currentDirectory;  // The directory selected in the game browsing window.
@@ -530,7 +540,7 @@ public:
 	void RemoveRecent(const std::string &file);
 	void CleanRecent();
 
-	static void DownloadCompletedCallback(http::Download &download);
+	static void DownloadCompletedCallback(http::Request &download);
 	void DismissUpgrade();
 
 	void ResetControlLayout();
@@ -556,6 +566,10 @@ public:
 	void SetAppendedConfigIni(const Path &path);
 	void UpdateAfterSettingAutoFrameSkip();
 	void NotifyUpdatedCpuCore();
+
+	// Applies the Auto setting if set. Returns an enum value from PSP_SYSTEMPARAM_LANGUAGE_*.
+	int GetPSPLanguage();
+
 protected:
 	void LoadStandardControllerIni();
 	void LoadLangValuesMapping();
@@ -582,6 +596,6 @@ private:
 std::string CreateRandMAC();
 
 // TODO: Find a better place for this.
-extern http::Downloader g_DownloadManager;
+extern http::RequestManager g_DownloadManager;
 extern Config g_Config;
 

@@ -22,6 +22,7 @@
 #include "Common/CommonTypes.h"
 #include "Common/Data/Collections/Hashmaps.h"
 
+#include "GPU/Math3D.h"
 #include "GPU/GPUState.h"
 #include "GPU/Common/GPUStateUtils.h"
 #include "GPU/Common/GPUDebugInterface.h"
@@ -66,6 +67,13 @@ public:
 	virtual ~TessellationDataTransfer() {}
 	void CopyControlPoints(float *pos, float *tex, float *col, int posStride, int texStride, int colStride, const SimpleVertex *const *points, int size, u32 vertType);
 	virtual void SendDataToShader(const SimpleVertex *const *points, int size_u, int size_v, u32 vertType, const Spline::Weight2D &weights) = 0;
+};
+
+// Culling plane.
+struct Plane {
+	float x, y, z, w;
+	void Set(float _x, float _y, float _z, float _w) { x = _x; y = _y; z = _z; w = _w; }
+	float Test(const float f[3]) const { return x * f[0] + y * f[1] + z * f[2] + w; }
 };
 
 class DrawEngineCommon {
@@ -122,7 +130,7 @@ public:
 		return false;
 	}
 	int GetNumDrawCalls() const {
-		return numDrawCalls;
+		return numDrawCalls_;
 	}
 
 	VertexDecoder *GetVertexDecoder(u32 vtype);
@@ -130,7 +138,8 @@ public:
 	virtual void ClearTrackedVertexArrays() {}
 
 protected:
-	virtual bool UpdateUseHWTessellation(bool enabled) { return enabled; }
+	virtual bool UpdateUseHWTessellation(bool enabled) const { return enabled; }
+	void UpdatePlanes();
 
 	int ComputeNumVertsToDecode() const;
 	void DecodeVerts(u8 *dest);
@@ -143,7 +152,7 @@ protected:
 	uint64_t ComputeHash();
 
 	// Vertex decoding
-	void DecodeVertsStep(u8 *dest, int &i, int &decodedVerts);
+	void DecodeVertsStep(u8 *dest, int &i, int &decodedVerts, const UVScale *uvScale);
 
 	void ApplyFramebufferRead(FBOTexState *fboTexState);
 
@@ -175,6 +184,8 @@ protected:
 		}
 	}
 
+	uint32_t ComputeDrawcallsHash() const;
+
 	bool useHWTransform_ = false;
 	bool useHWTessellation_ = false;
 	// Used to prevent unnecessary flushing in softgpu.
@@ -185,8 +196,8 @@ protected:
 	bool everUsedExactEqualDepth_ = false;
 
 	// Vertex collector buffers
-	u8 *decoded = nullptr;
-	u16 *decIndex = nullptr;
+	u8 *decoded_ = nullptr;
+	u16 *decIndex_ = nullptr;
 
 	// Cached vertex decoders
 	u32 lastVType_ = -1;  // corresponds to dec_.  Could really just pick it out of dec_...
@@ -195,8 +206,8 @@ protected:
 	VertexDecoderJitCache *decJitCache_ = nullptr;
 	VertexDecoderOptions decOptions_{};
 
-	TransformedVertex *transformed = nullptr;
-	TransformedVertex *transformedExpanded = nullptr;
+	TransformedVertex *transformed_ = nullptr;
+	TransformedVertex *transformedExpanded_ = nullptr;
 
 	// Defer all vertex decoding to a "Flush" (except when software skinning)
 	struct DeferredDrawCall {
@@ -212,13 +223,12 @@ protected:
 	};
 
 	enum { MAX_DEFERRED_DRAW_CALLS = 128 };
-	DeferredDrawCall drawCalls[MAX_DEFERRED_DRAW_CALLS];
-	int numDrawCalls = 0;
+	DeferredDrawCall drawCalls_[MAX_DEFERRED_DRAW_CALLS];
+	int numDrawCalls_ = 0;
 	int vertexCountInDrawCalls_ = 0;
 
 	int decimationCounter_ = 0;
 	int decodeCounter_ = 0;
-	u32 dcid_ = 0;
 
 	// Vertex collector state
 	IndexGenerator indexGen;
@@ -235,4 +245,9 @@ protected:
 
 	// Hardware tessellation
 	TessellationDataTransfer *tessDataTransfer;
+
+	// Culling
+	Plane planes_[6];
+	Vec2f minOffset_;
+	Vec2f maxOffset_;
 };

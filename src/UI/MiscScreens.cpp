@@ -34,6 +34,7 @@
 #include "Common/File/VFS/VFS.h"
 
 #include "Common/Data/Color/RGBAUtil.h"
+#include "Common/Data/Encoding/Utf8.h"
 #include "Common/Data/Text/I18n.h"
 #include "Common/Data/Random/Rng.h"
 #include "Common/TimeUtil.h"
@@ -435,7 +436,7 @@ void HandleCommonMessages(const char *message, const char *value, ScreenManager 
 		auto sy = GetI18NCategory(I18NCat::SYSTEM);
 		auto langScreen = new NewLanguageScreen(sy->T("Language"));
 		langScreen->OnChoice.Add([](UI::EventParams &) {
-			NativeMessageReceived("recreateviews", "");
+			System_PostUIMessage("recreateviews", "");
 			System_Notify(SystemNotification::UI);
 			return UI::EVENT_DONE;
 		});
@@ -542,8 +543,14 @@ void PromptScreen::CreateViews() {
 	Choice *yesButton = rightColumnItems->Add(new Choice(yesButtonText_));
 	yesButton->OnClick.Handle(this, &PromptScreen::OnYes);
 	root_->SetDefaultFocusView(yesButton);
-	if (!noButtonText_.empty())
+	if (!noButtonText_.empty()) {
 		rightColumnItems->Add(new Choice(noButtonText_))->OnClick.Handle(this, &PromptScreen::OnNo);
+	} else {
+		// This is an information screen, not a question.
+		// Sneak in the version of PPSSPP in the corner, for debug-reporting user screenshots.
+		std::string version = System_GetProperty(SYSPROP_BUILD_VERSION);
+		root_->Add(new TextView(version, 0, true, new AnchorLayoutParams(10.0f, NONE, NONE, 10.0f)));
+	}
 }
 
 UI::EventReturn PromptScreen::OnYes(UI::EventParams &e) {
@@ -671,18 +678,9 @@ void NewLanguageScreen::OnCompleted(DialogResult result) {
 		iniLoadedSuccessfully = g_i18nrepo.LoadIni(g_Config.sLanguageIni, langOverridePath);
 
 	if (iniLoadedSuccessfully) {
-		// Dunno what else to do here.
-		auto &langValuesMapping = g_Config.GetLangValuesMapping();
-
-		auto iter = langValuesMapping.find(code);
-		if (iter == langValuesMapping.end()) {
-			// Fallback to English
-			g_Config.iLanguage = PSP_SYSTEMPARAM_LANGUAGE_ENGLISH;
-		} else {
-			g_Config.iLanguage = iter->second.second;
-		}
 		RecreateViews();
 	} else {
+		// Failed to load the language ini. Shouldn't really happen, but let's just switch back to the old language.
 		g_Config.sLanguageIni = oldLang;
 	}
 }
@@ -797,11 +795,13 @@ void LogoScreen::render() {
 	int ppsspp_org_y = bounds.h / 2 + 130;
 	dc.DrawText("www.ppsspp.org", bounds.centerX(), ppsspp_org_y, textColor, ALIGN_CENTER);
 
-#if !PPSSPP_PLATFORM(UWP)
+#if !PPSSPP_PLATFORM(UWP) || defined(_DEBUG)
 	// Draw the graphics API, except on UWP where it's always D3D11
 	std::string apiName = screenManager()->getDrawContext()->GetInfoString(InfoField::APINAME);
 #ifdef _DEBUG
-	apiName += ", debug build";
+	apiName += ", debug build ";
+	// Add some emoji for testing.
+	apiName += CodepointToUTF8(0x1F41B) + CodepointToUTF8(0x1F41C) + CodepointToUTF8(0x1F914);
 #endif
 	dc.DrawText(gr->T(apiName), bounds.centerX(), ppsspp_org_y + 50, textColor, ALIGN_CENTER);
 #endif
@@ -972,6 +972,7 @@ void CreditsScreen::render() {
 		"adenovan",
 		"iota97",
 		"Lubos",
+		"stenzek",  // For retroachievements integration
 		"",
 		cr->T("specialthanks", "Special thanks to:"),
 		specialthanksMaxim.c_str(),
@@ -1063,8 +1064,8 @@ void CreditsScreen::render() {
 	dc.Flush();
 }
 
-SettingInfoMessage::SettingInfoMessage(int align, UI::AnchorLayoutParams *lp)
-	: UI::LinearLayout(UI::ORIENT_HORIZONTAL, lp) {
+SettingInfoMessage::SettingInfoMessage(int align, float cutOffY, UI::AnchorLayoutParams *lp)
+	: UI::LinearLayout(UI::ORIENT_HORIZONTAL, lp), cutOffY_(cutOffY) {
 	using namespace UI;
 	SetSpacing(0.0f);
 	Add(new UI::Spacer(10.0f));
@@ -1076,7 +1077,7 @@ void SettingInfoMessage::Show(const std::string &text, const UI::View *refView) 
 	if (refView) {
 		Bounds b = refView->GetBounds();
 		const UI::AnchorLayoutParams *lp = GetLayoutParams()->As<UI::AnchorLayoutParams>();
-		if (b.y >= cutOffY_) {
+		if (cutOffY_ != -1.0f && b.y >= cutOffY_) {
 			ReplaceLayoutParams(new UI::AnchorLayoutParams(lp->width, lp->height, lp->left, 80.0f, lp->right, lp->bottom, lp->center));
 		} else {
 			ReplaceLayoutParams(new UI::AnchorLayoutParams(lp->width, lp->height, lp->left, g_display.dp_yres - 80.0f - 40.0f, lp->right, lp->bottom, lp->center));
@@ -1114,5 +1115,5 @@ void SettingInfoMessage::Draw(UIContext &dc) {
 }
 
 std::string SettingInfoMessage::GetText() const {
-	return showing_ && text_ ? text_->GetText() : "";
+	return (showing_ && text_) ? text_->GetText() : "";
 }

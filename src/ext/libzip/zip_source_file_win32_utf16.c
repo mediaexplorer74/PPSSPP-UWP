@@ -31,19 +31,7 @@
   IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #ifdef MS_UWP
-#ifdef _M_ARM
-#define _ARM_
-#else
-#define _AMD64_
-#endif
-#if !defined(LEGACY_SUPPORT)
 #include <fileapifromapp.h>
-#else
-#include <fileapi.h>
-#endif
-#if !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
-#include "UWP/UWPHelpers/UWP2C.h"
-#endif
 #endif
 
 #include "zip_source_file_win32.h"
@@ -53,29 +41,23 @@ static HANDLE __stdcall utf16_create_file(const char *name, DWORD access, DWORD 
 static void utf16_make_tempname(char *buf, size_t len, const char *name, zip_uint32_t i);
 static char *utf16_strdup(const char *string);
 
-#ifdef MS_UWP && !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
-static BOOL GetFileAttr(const void* name, GET_FILEEX_INFO_LEVELS info_level, void* lpFileInformation);
-static BOOL __stdcall
-GetFileAttr(const void* name, GET_FILEEX_INFO_LEVELS info_level, void* lpFileInformation) {
-	// Try API first
-	if(!GetFileAttributesExW(name, info_level, lpFileInformation)){
-	  return GetFileAttributesUWP(name, lpFileInformation);
-	}
-	return 1;
+#ifdef MS_UWP
+static BOOL __stdcall GetFileAttr(const void* name, GET_FILEEX_INFO_LEVELS info_level, void* lpFileInformation) {
+	BOOL state = GetFileAttributesExFromAppW(name, info_level, lpFileInformation);
+	return state;
 }
 
-static BOOL DelFile(const void* name);
-static BOOL __stdcall
-DelFile(const void* name) {
-	return DeleteFileUWP(name);
+static BOOL __stdcall DelFile(const void* name) {
+	BOOL state = DeleteFileFromAppW(name);
+	return state;
 }
 
 zip_win32_file_operations_t ops_utf16 = {
 	utf16_allocate_tempname,
-	utf16_create_file, // Will invoke UWP Storage manager (If needed)
-	DelFile, // Will invoke UWP Storage manager
+	utf16_create_file,
+	DelFile,
 	GetFileAttributesW,
-	GetFileAttr, // Will invoke UWP Storage manager
+	GetFileAttr,
 	utf16_make_tempname,
 	MoveFileExW,
 	SetFileAttributesW,
@@ -83,15 +65,15 @@ zip_win32_file_operations_t ops_utf16 = {
 };
 #else
 zip_win32_file_operations_t ops_utf16 = {
-	utf16_allocate_tempname,
-	utf16_create_file,
-	DeleteFileW,
-	GetFileAttributesW,
-	GetFileAttributesExW,
-	utf16_make_tempname,
-	MoveFileExW,
-	SetFileAttributesW,
-	utf16_strdup
+    utf16_allocate_tempname,
+    utf16_create_file,
+    DeleteFileW,
+    GetFileAttributesW,
+    GetFileAttributesExW,
+    utf16_make_tempname,
+    MoveFileExW,
+    SetFileAttributesW,
+    utf16_strdup
 };
 #endif
 
@@ -137,17 +119,7 @@ utf16_create_file(const char *name, DWORD access, DWORD share_mode, PSECURITY_AT
 
     return CreateFile2((const wchar_t *)name, access, share_mode, creation_disposition, &extParams);
 #else
-#if !defined(LEGACY_SUPPORT)
-    HANDLE h = CreateFile2FromAppW((const wchar_t *)name, access, share_mode, creation_disposition, NULL);
-#else
-    HANDLE h = CreateFile2((const wchar_t*)name, access, share_mode, creation_disposition, NULL);
-#endif
-#if !defined(NO_STORAGE_MANAGER) && !defined(__LIBRETRO__)
-	if (h == INVALID_HANDLE_VALUE) {
-		h = CreateFileUWP(name, (int)access, (int)share_mode, (int)creation_disposition);
-	}
-#endif
-    return h;
+    return CreateFile2FromAppW((const wchar_t *)name, access, share_mode, creation_disposition, NULL);
 #endif
 #else
     return CreateFileW((const wchar_t *)name, access, share_mode, security_attributes, creation_disposition, file_attributes, template_file);

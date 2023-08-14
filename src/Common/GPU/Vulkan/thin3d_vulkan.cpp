@@ -335,8 +335,11 @@ struct DescriptorSetKey {
 class VKTexture : public Texture {
 public:
 	VKTexture(VulkanContext *vulkan, VkCommandBuffer cmd, VulkanPushPool *pushBuffer, const TextureDesc &desc)
-		: vulkan_(vulkan), mipLevels_(desc.mipLevels), format_(desc.format) {}
+		: vulkan_(vulkan), mipLevels_(desc.mipLevels) {
+		format_ = desc.format;
+	}
 	bool Create(VkCommandBuffer cmd, VulkanPushPool *pushBuffer, const TextureDesc &desc);
+	void Update(VkCommandBuffer cmd, VulkanPushPool *pushBuffer, const uint8_t *const *data, TextureCallback callback, int numLevels);
 
 	~VKTexture() {
 		Destroy();
@@ -356,7 +359,13 @@ public:
 		return VK_NULL_HANDLE;  // This would be bad.
 	}
 
+	int NumLevels() const {
+		return mipLevels_;
+	}
+
 private:
+	void UpdateInternal(VkCommandBuffer cmd, VulkanPushPool *pushBuffer, const uint8_t *const *data, TextureCallback callback, int numLevels);
+
 	void Destroy() {
 		if (vkTex_) {
 			vkTex_->Destroy();
@@ -369,19 +378,16 @@ private:
 	VulkanTexture *vkTex_ = nullptr;
 
 	int mipLevels_ = 0;
-
-	DataFormat format_ = DataFormat::UNDEFINED;
 };
 
 class VKFramebuffer;
 
 class VKContext : public DrawContext {
 public:
-	VKContext(VulkanContext *vulkan);
+	VKContext(VulkanContext *vulkan, bool useRenderThread);
 	~VKContext();
 
 	void DebugAnnotate(const char *annotation) override;
-	void SetDebugFlags(DebugFlags flags) override;
 
 	const DeviceCaps &GetDeviceCaps() const override {
 		return caps_;
@@ -421,6 +427,7 @@ public:
 	Framebuffer *CreateFramebuffer(const FramebufferDesc &desc) override;
 
 	void UpdateBuffer(Buffer *buffer, const uint8_t *data, size_t offset, size_t size, UpdateBufferFlags flags) override;
+	void UpdateTextureLevels(Texture *texture, const uint8_t **data, TextureCallback initDataCallback, int numLevels) override;
 
 	void CopyFramebufferImage(Framebuffer *src, int level, int x, int y, int z, Framebuffer *dst, int dstLevel, int dstX, int dstY, int dstZ, int width, int height, int depth, int channelBits, const char *tag) override;
 	bool BlitFramebuffer(Framebuffer *src, int srcX1, int srcY1, int srcX2, int srcY2, Framebuffer *dst, int dstX1, int dstY1, int dstX2, int dstY2, int channelBits, FBBlitFilter filter, const char *tag) override;
@@ -430,7 +437,6 @@ public:
 	// These functions should be self explanatory.
 	void BindFramebufferAsRenderTarget(Framebuffer *fbo, const RenderPassInfo &rp, const char *tag) override;
 	void BindFramebufferAsTexture(Framebuffer *fbo, int binding, FBChannel channelBit, int layer) override;
-	void BindCurrentFramebufferForColorInput() override;
 
 	void GetFramebufferDimensions(Framebuffer *fbo, int *w, int *h) override;
 
@@ -472,9 +478,19 @@ public:
 
 	void Clear(int mask, uint32_t colorval, float depthVal, int stencilVal) override;
 
-	void BeginFrame() override;
+	void BeginFrame(DebugFlags debugFlags) override;
 	void EndFrame() override;
+	void Present(int vblanks) override;
+
 	void WipeQueue() override;
+
+	int GetFrameCount() override {
+		return frameCount_;
+	}
+
+	FrameTimeData GetFrameTimeData(int framesBack) const override {
+		return renderManager_.GetFrameTimeData(framesBack);
+	}
 
 	void FlushState() override {}
 
@@ -502,7 +518,7 @@ public:
 	VkDescriptorSet GetOrCreateDescriptorSet(VkBuffer buffer);
 
 	std::vector<std::string> GetFeatureList() const override;
-	std::vector<std::string> GetExtensionList() const override;
+	std::vector<std::string> GetExtensionList(bool device, bool enabledOnly) const override;
 
 	uint64_t GetNativeObject(NativeObject obj, void *srcObject) override;
 
@@ -516,10 +532,15 @@ public:
 		renderManager_.SetInvalidationCallback(callback);
 	}
 
+	std::string GetGpuProfileString() const override {
+		return renderManager_.GetGpuProfileString();
+	}
+
 private:
 	VulkanTexture *GetNullTexture();
 	VulkanContext *vulkan_ = nullptr;
 
+	int frameCount_ = 0;
 	VulkanRenderManager renderManager_;
 
 	VulkanTexture *nullTexture_ = nullptr;
@@ -536,7 +557,6 @@ private:
 	AutoRef<VKFramebuffer> curFramebuffer_;
 
 	VkDevice device_;
-	DebugFlags debugFlags_ = DebugFlags::NONE;
 
 	enum {
 		MAX_FRAME_COMMAND_BUFFERS = 256,
@@ -684,6 +704,7 @@ VulkanTexture *VKContext::GetNullTexture() {
 		uint32_t bindOffset;
 		VkBuffer bindBuf;
 		uint32_t *data = (uint32_t *)push_->Allocate(w * h * 4, 4, &bindBuf, &bindOffset);
+		_assert_(data != nullptr);
 		for (int y = 0; y < h; y++) {
 			for (int x = 0; x < w; x++) {
 				// data[y*w + x] = ((x ^ y) & 1) ? 0xFF808080 : 0xFF000000;   // gray/black checkerboard
@@ -747,14 +768,14 @@ enum class TextureState {
 	PENDING_DESTRUCTION,
 };
 
-bool VKTexture::Create(VkCommandBuffer cmd, VulkanPushPool *push, const TextureDesc &desc) {
+bool VKTexture::Create(VkCommandBuffer cmd, VulkanPushPool *pushBuffer, const TextureDesc &desc) {
 	// Zero-sized textures not allowed.
 	_assert_(desc.width * desc.height * desc.depth > 0);  // remember to set depth to 1!
 	if (desc.width * desc.height * desc.depth <= 0) {
 		ERROR_LOG(G3D,  "Bad texture dimensions %dx%dx%d", desc.width, desc.height, desc.depth);
 		return false;
 	}
-	_assert_(push);
+	_dbg_assert_(pushBuffer);
 	format_ = desc.format;
 	mipLevels_ = desc.mipLevels;
 	width_ = desc.width;
@@ -762,8 +783,6 @@ bool VKTexture::Create(VkCommandBuffer cmd, VulkanPushPool *push, const TextureD
 	depth_ = desc.depth;
 	vkTex_ = new VulkanTexture(vulkan_, desc.tag);
 	VkFormat vulkanFormat = DataFormatToVulkan(format_);
-	int bpp = GetBpp(vulkanFormat);
-	int bytesPerPixel = bpp / 8;
 	int usageBits = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	if (mipLevels_ > (int)desc.initData.size()) {
 		// Gonna have to generate some, which requires TRANSFER_SRC
@@ -778,37 +797,53 @@ bool VKTexture::Create(VkCommandBuffer cmd, VulkanPushPool *push, const TextureD
 	}
 	VkImageLayout layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 	if (desc.initData.size()) {
-		int w = width_;
-		int h = height_;
-		int d = depth_;
-		int i;
-		for (i = 0; i < (int)desc.initData.size(); i++) {
-			uint32_t offset;
-			VkBuffer buf;
-			size_t size = w * h * d * bytesPerPixel;
-			if (desc.initDataCallback) {
-				uint8_t *dest = (uint8_t *)push->Allocate(size, 16, &buf, &offset);
-				if (!desc.initDataCallback(dest, desc.initData[i], w, h, d, w * bytesPerPixel, h * w * bytesPerPixel)) {
-					memcpy(dest, desc.initData[i], size);
-				}
-			} else {
-				offset = push->Push((const void *)desc.initData[i], size, 16, &buf);
-			}
-			TextureCopyBatch batch;
-			vkTex_->CopyBufferToMipLevel(cmd, &batch, i, w, h, 0, buf, offset, w);
-			vkTex_->FinishCopyBatch(cmd, &batch);
-			w = (w + 1) / 2;
-			h = (h + 1) / 2;
-			d = (d + 1) / 2;
-		}
+		UpdateInternal(cmd, pushBuffer, desc.initData.data(), desc.initDataCallback, (int)desc.initData.size());
 		// Generate the rest of the mips automatically.
-		if (i < mipLevels_) {
-			vkTex_->GenerateMips(cmd, i, false);
+		if (desc.initData.size() < mipLevels_) {
+			vkTex_->GenerateMips(cmd, (int)desc.initData.size(), false);
 			layout = VK_IMAGE_LAYOUT_GENERAL;
 		}
 	}
 	vkTex_->EndCreate(cmd, false, VK_PIPELINE_STAGE_TRANSFER_BIT, layout);
 	return true;
+}
+
+void VKTexture::Update(VkCommandBuffer cmd, VulkanPushPool *pushBuffer, const uint8_t * const *data, TextureCallback initDataCallback, int numLevels) {
+	// Before we can use UpdateInternal, we need to transition the image to the same state as after CreateDirect,
+	// making it ready for writing.
+	vkTex_->PrepareForTransferDst(cmd, numLevels);
+	UpdateInternal(cmd, pushBuffer, data, initDataCallback, numLevels);
+	vkTex_->RestoreAfterTransferDst(cmd, numLevels);
+}
+
+void VKTexture::UpdateInternal(VkCommandBuffer cmd, VulkanPushPool *pushBuffer, const uint8_t * const *data, TextureCallback initDataCallback, int numLevels) {
+	int w = width_;
+	int h = height_;
+	int d = depth_;
+	int i;
+	VkFormat vulkanFormat = DataFormatToVulkan(format_);
+	int bpp = GetBpp(vulkanFormat);
+	int bytesPerPixel = bpp / 8;
+	TextureCopyBatch batch;
+	for (i = 0; i < numLevels; i++) {
+		uint32_t offset;
+		VkBuffer buf;
+		size_t size = w * h * d * bytesPerPixel;
+		uint8_t *dest = (uint8_t *)pushBuffer->Allocate(size, 16, &buf, &offset);
+		if (initDataCallback) {
+			_assert_(dest != nullptr);
+			if (!initDataCallback(dest, data[i], w, h, d, w * bytesPerPixel, h * w * bytesPerPixel)) {
+				memcpy(dest, data[i], size);
+			}
+		} else {
+			memcpy(dest, data[i], size);
+		}
+		vkTex_->CopyBufferToMipLevel(cmd, &batch, i, w, h, 0, buf, offset, w);
+		w = (w + 1) / 2;
+		h = (h + 1) / 2;
+		d = (d + 1) / 2;
+	}
+	vkTex_->FinishCopyBatch(cmd, &batch);
 }
 
 static DataFormat DataFormatFromVulkanDepth(VkFormat fmt) {
@@ -830,12 +865,13 @@ static DataFormat DataFormatFromVulkanDepth(VkFormat fmt) {
 	return DataFormat::UNDEFINED;
 }
 
-VKContext::VKContext(VulkanContext *vulkan)
-	: vulkan_(vulkan), renderManager_(vulkan) {
+VKContext::VKContext(VulkanContext *vulkan, bool useRenderThread)
+	: vulkan_(vulkan), renderManager_(vulkan, useRenderThread) {
 	shaderLanguageDesc_.Init(GLSL_VULKAN);
 
 	VkFormat depthStencilFormat = vulkan->GetDeviceInfo().preferredDepthStencilFormat;
 
+	caps_.setMaxFrameLatencySupported = true;
 	caps_.anisoSupported = vulkan->GetDeviceFeatures().enabled.standard.samplerAnisotropy != 0;
 	caps_.geometryShaderSupported = vulkan->GetDeviceFeatures().enabled.standard.geometryShader != 0;
 	caps_.tesselationShaderSupported = vulkan->GetDeviceFeatures().enabled.standard.tessellationShader != 0;
@@ -861,6 +897,7 @@ VKContext::VKContext(VulkanContext *vulkan)
 	caps_.logicOpSupported = vulkan->GetDeviceFeatures().enabled.standard.logicOp != 0;
 	caps_.multiViewSupported = vulkan->GetDeviceFeatures().enabled.multiview.multiview != 0;
 	caps_.sampleRateShadingSupported = vulkan->GetDeviceFeatures().enabled.standard.sampleRateShading != 0;
+	caps_.textureSwizzleSupported = true;
 
 	const auto &limits = vulkan->GetPhysicalDeviceProperties().properties.limits;
 
@@ -983,9 +1020,9 @@ VKContext::VKContext(VulkanContext *vulkan)
 		}
 	}
 
-	// Limited, through input attachments and self-dependencies.
-	// We turn it off here already if buggy.
-	caps_.framebufferFetchSupported = !bugs_.Has(Bugs::SUBPASS_FEEDBACK_BROKEN);
+	// Vulkan can support this through input attachments and various extensions, but not worth
+	// the trouble.
+	caps_.framebufferFetchSupported = false;
 
 	caps_.deviceID = deviceProps.deviceID;
 	device_ = vulkan->GetDevice();
@@ -1066,9 +1103,8 @@ VKContext::~VKContext() {
 	vulkan_->Delete().QueueDeletePipelineCache(pipelineCache_);
 }
 
-void VKContext::BeginFrame() {
-	// TODO: Bad dependency on g_Config here!
-	renderManager_.BeginFrame(debugFlags_ & DebugFlags::PROFILE_TIMESTAMPS, debugFlags_ & DebugFlags::PROFILE_SCOPES);
+void VKContext::BeginFrame(DebugFlags debugFlags) {
+	renderManager_.BeginFrame(debugFlags & DebugFlags::PROFILE_TIMESTAMPS, debugFlags & DebugFlags::PROFILE_SCOPES);
 
 	FrameData &frame = frame_[vulkan_->GetCurFrame()];
 
@@ -1078,10 +1114,16 @@ void VKContext::BeginFrame() {
 }
 
 void VKContext::EndFrame() {
+	// Do all the work to submit the command buffers etc.
 	renderManager_.Finish();
-
 	// Unbind stuff, to avoid accidentally relying on it across frames (and provide some protection against forgotten unbinds of deleted things).
 	Invalidate(InvalidationFlags::CACHED_RENDER_STATE);
+}
+
+void VKContext::Present(int vblanks) {
+	_dbg_assert_(vblanks == 0 || vblanks == 1);
+	renderManager_.Present();
+	frameCount_++;
 }
 
 void VKContext::Invalidate(InvalidationFlags flags) {
@@ -1340,6 +1382,20 @@ Texture *VKContext::CreateTexture(const TextureDesc &desc) {
 	}
 }
 
+void VKContext::UpdateTextureLevels(Texture *texture, const uint8_t **data, TextureCallback initDataCallback, int numLevels) {
+	VkCommandBuffer initCmd = renderManager_.GetInitCmd();
+	if (!push_ || !initCmd) {
+		// Too early! Fail.
+		ERROR_LOG(G3D, "Can't create textures before the first frame has started.");
+		return;
+	}
+
+	VKTexture *tex = (VKTexture *)texture;
+
+	_dbg_assert_(numLevels <= tex->NumLevels());
+	tex->Update(initCmd, push_, data, initDataCallback, numLevels);
+}
+
 static inline void CopySide(VkStencilOpState &dest, const StencilSetup &src) {
 	dest.compareOp = compToVK[(int)src.compareOp];
 	dest.failOp = stencilOpToVK[(int)src.failOp];
@@ -1495,7 +1551,7 @@ void VKContext::DrawIndexed(int vertexCount, int offset) {
 
 	BindCurrentPipeline();
 	ApplyDynamicState();
-	renderManager_.DrawIndexed(descSet, 1, &ubo_offset, vulkanVbuf, (int)vbBindOffset + curVBufferOffsets_[0], vulkanIbuf, (int)ibBindOffset + offset * sizeof(uint32_t), vertexCount, 1, VK_INDEX_TYPE_UINT16);
+	renderManager_.DrawIndexed(descSet, 1, &ubo_offset, vulkanVbuf, (int)vbBindOffset + curVBufferOffsets_[0], vulkanIbuf, (int)ibBindOffset + offset * sizeof(uint32_t), vertexCount, 1);
 }
 
 void VKContext::DrawUP(const void *vdata, int vertexCount) {
@@ -1505,7 +1561,12 @@ void VKContext::DrawUP(const void *vdata, int vertexCount) {
 	}
 
 	VkBuffer vulkanVbuf, vulkanUBObuf;
-	size_t vbBindOffset = push_->Push(vdata, vertexCount * curPipeline_->stride[0], 4, &vulkanVbuf);
+	size_t dataSize = vertexCount * curPipeline_->stride[0];
+	uint32_t vbBindOffset;
+	uint8_t *dataPtr = push_->Allocate(dataSize, 4, &vulkanVbuf, &vbBindOffset);
+	_assert_(dataPtr != nullptr);
+	memcpy(dataPtr, vdata, dataSize);
+
 	uint32_t ubo_offset = (uint32_t)curPipeline_->PushUBO(push_, vulkan_, &vulkanUBObuf);
 
 	VkDescriptorSet descSet = GetOrCreateDescriptorSet(vulkanUBObuf);
@@ -1534,8 +1595,8 @@ void VKContext::Clear(int clearMask, uint32_t colorval, float depthVal, int sten
 	renderManager_.Clear(colorval, depthVal, stencilVal, mask);
 }
 
-DrawContext *T3DCreateVulkanContext(VulkanContext *vulkan) {
-	return new VKContext(vulkan);
+DrawContext *T3DCreateVulkanContext(VulkanContext *vulkan, bool useRenderThread) {
+	return new VKContext(vulkan, useRenderThread);
 }
 
 void AddFeature(std::vector<std::string> &features, const char *name, VkBool32 available, VkBool32 enabled) {
@@ -1566,16 +1627,24 @@ std::vector<std::string> VKContext::GetFeatureList() const {
 
 	AddFeature(features, "multiview", vulkan_->GetDeviceFeatures().available.multiview.multiview, vulkan_->GetDeviceFeatures().enabled.multiview.multiview);
 	AddFeature(features, "multiviewGeometryShader", vulkan_->GetDeviceFeatures().available.multiview.multiviewGeometryShader, vulkan_->GetDeviceFeatures().enabled.multiview.multiviewGeometryShader);
+	AddFeature(features, "presentId", vulkan_->GetDeviceFeatures().available.presentId.presentId, vulkan_->GetDeviceFeatures().enabled.presentId.presentId);
+	AddFeature(features, "presentWait", vulkan_->GetDeviceFeatures().available.presentWait.presentWait, vulkan_->GetDeviceFeatures().enabled.presentWait.presentWait);
 
 	features.emplace_back(std::string("Preferred depth buffer format: ") + VulkanFormatToString(vulkan_->GetDeviceInfo().preferredDepthStencilFormat));
 
 	return features;
 }
 
-std::vector<std::string> VKContext::GetExtensionList() const {
+std::vector<std::string> VKContext::GetExtensionList(bool device, bool enabledOnly) const {
 	std::vector<std::string> extensions;
-	for (auto &iter : vulkan_->GetDeviceExtensionsAvailable()) {
-		extensions.push_back(iter.extensionName);
+	if (enabledOnly) {
+		for (auto &iter : (device ? vulkan_->GetDeviceExtensionsEnabled() : vulkan_->GetInstanceExtensionsEnabled())) {
+			extensions.push_back(iter);
+		}
+	} else {
+		for (auto &iter : (device ? vulkan_->GetDeviceExtensionsAvailable() : vulkan_->GetInstanceExtensionsAvailable())) {
+			extensions.push_back(iter.extensionName);
+		}
 	}
 	return extensions;
 }
@@ -1728,10 +1797,6 @@ void VKContext::BindFramebufferAsTexture(Framebuffer *fbo, int binding, FBChanne
 	boundImageView_[binding] = renderManager_.BindFramebufferAsTexture(fb->GetFB(), binding, aspect, layer);
 }
 
-void VKContext::BindCurrentFramebufferForColorInput() {
-	renderManager_.BindCurrentFramebufferAsInputAttachment0(VK_IMAGE_ASPECT_COLOR_BIT);
-}
-
 void VKContext::GetFramebufferDimensions(Framebuffer *fbo, int *w, int *h) {
 	VKFramebuffer *fb = (VKFramebuffer *)fbo;
 	if (fb) {
@@ -1806,10 +1871,6 @@ uint64_t VKContext::GetNativeObject(NativeObject obj, void *srcObject) {
 
 void VKContext::DebugAnnotate(const char *annotation) {
 	renderManager_.DebugAnnotate(annotation);
-}
-
-void VKContext::SetDebugFlags(DebugFlags flags) {
-	debugFlags_ = flags;
 }
 
 }  // namespace Draw

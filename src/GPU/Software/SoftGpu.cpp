@@ -81,7 +81,7 @@ const SoftwareCommandTableEntry softgpuCommandTable[] = {
 	{ GE_CMD_VADDR, FLAG_EXECUTE, SoftDirty::NONE, &GPUCommon::Execute_Vaddr },
 	{ GE_CMD_IADDR, FLAG_EXECUTE, SoftDirty::NONE, &GPUCommon::Execute_Iaddr },
 	{ GE_CMD_BJUMP, FLAG_EXECUTE | FLAG_READS_PC | FLAG_WRITES_PC, SoftDirty::NONE, &GPUCommon::Execute_BJump },
-	{ GE_CMD_BOUNDINGBOX, FLAG_EXECUTE, SoftDirty::NONE, &GPUCommon::Execute_BoundingBox },
+	{ GE_CMD_BOUNDINGBOX, FLAG_EXECUTE, SoftDirty::NONE, &SoftGPU::Execute_BoundingBox },
 
 	{ GE_CMD_PRIM, FLAG_EXECUTE, SoftDirty::NONE, &SoftGPU::Execute_Prim },
 	{ GE_CMD_BEZIER, FLAG_EXECUTE, SoftDirty::NONE, &SoftGPU::Execute_Bezier },
@@ -449,11 +449,13 @@ SoftGPU::SoftGPU(GraphicsContext *gfxCtx, Draw::DrawContext *draw)
 	if (gfxCtx && draw) {
 		presentation_ = new PresentationCommon(draw_);
 		presentation_->SetLanguage(draw_->GetShaderLanguageDesc().shaderLanguage);
+		presentation_->UpdateDisplaySize(PSP_CoreParameter().pixelWidth, PSP_CoreParameter().pixelHeight);
+		presentation_->UpdateRenderSize(PSP_CoreParameter().renderWidth, PSP_CoreParameter().renderHeight);
 	}
 
 	NotifyConfigChanged();
-	NotifyRenderResized();
 	NotifyDisplayResized();
+	NotifyRenderResized();
 }
 
 void SoftGPU::DeviceLost() {
@@ -723,14 +725,28 @@ void SoftGPU::NotifyRenderResized() {
 }
 
 void SoftGPU::NotifyDisplayResized() {
-	if (presentation_) {
+	displayResized_ = true;
+}
+
+void SoftGPU::CheckDisplayResized() {
+	if (displayResized_ && presentation_) {
 		presentation_->UpdateDisplaySize(PSP_CoreParameter().pixelWidth, PSP_CoreParameter().pixelHeight);
 		presentation_->UpdateRenderSize(PSP_CoreParameter().renderWidth, PSP_CoreParameter().renderHeight);
 		presentation_->UpdatePostShader();
+		displayResized_ = false;
 	}
 }
 
-void SoftGPU::NotifyConfigChanged() {}
+void SoftGPU::CheckConfigChanged() {
+	if (configChanged_) {
+		drawEngineCommon_->NotifyConfigChanged();
+		BuildReportingInfo();
+		if (presentation_) {
+			presentation_->UpdatePostShader();
+		}
+		configChanged_ = false;
+	}
+}
 
 void SoftGPU::FastRunLoop(DisplayList &list) {
 	PROFILE_THIS_SCOPE("soft_runloop");
@@ -1015,6 +1031,11 @@ void SoftGPU::Execute_FramebufFormat(u32 op, u32 diff) {
 		drawEngine_->transformUnit.Flush("framebuf");
 }
 
+void SoftGPU::Execute_BoundingBox(u32 op, u32 diff) {
+	gstate_c.Dirty(DIRTY_CULL_PLANES);
+	GPUCommon::Execute_BoundingBox(op, diff);
+}
+
 void SoftGPU::Execute_ZbufPtr(u32 op, u32 diff) {
 	// We assume depthbuf.data won't change while we're drawing.
 	if (diff) {
@@ -1065,6 +1086,7 @@ void SoftGPU::Execute_WorldMtxData(u32 op, u32 diff) {
 		if (newVal != *target) {
 			*target = newVal;
 			dirtyFlags_ |= SoftDirty::TRANSFORM_MATRIX;
+			gstate_c.Dirty(DIRTY_CULL_PLANES);
 		}
 	}
 
@@ -1085,6 +1107,7 @@ void SoftGPU::Execute_ViewMtxData(u32 op, u32 diff) {
 		if (newVal != *target) {
 			*target = newVal;
 			dirtyFlags_ |= SoftDirty::TRANSFORM_MATRIX;
+			gstate_c.Dirty(DIRTY_CULL_PLANES);
 		}
 	}
 
@@ -1105,6 +1128,7 @@ void SoftGPU::Execute_ProjMtxData(u32 op, u32 diff) {
 		if (newVal != *target) {
 			*target = newVal;
 			dirtyFlags_ |= SoftDirty::TRANSFORM_MATRIX;
+			gstate_c.Dirty(DIRTY_CULL_PLANES);
 		}
 	}
 

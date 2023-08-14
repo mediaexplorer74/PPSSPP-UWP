@@ -401,10 +401,13 @@ static float GetDirectionScore(int originIndex, const View *origin, View *destin
 }
 
 NeighborResult ViewGroup::FindNeighbor(View *view, FocusDirection direction, NeighborResult result) {
-	if (!IsEnabled())
+	if (!IsEnabled()) {
+		INFO_LOG(SCECTRL, "Not enabled");
 		return result;
-	if (GetVisibility() != V_VISIBLE)
+	}
+	if (GetVisibility() != V_VISIBLE) {
 		return result;
+	}
 
 	// First, find the position of the view in the list.
 	int num = -1;
@@ -412,24 +415,6 @@ NeighborResult ViewGroup::FindNeighbor(View *view, FocusDirection direction, Nei
 		if (views_[i] == view) {
 			num = (int)i;
 			break;
-		}
-	}
-
-	if (direction == FOCUS_PREV || direction == FOCUS_NEXT) {
-		switch (direction) {
-		case FOCUS_PREV:
-			// If view not found, no neighbor to find.
-			if (num == -1)
-				return NeighborResult(0, 0.0f);
-			return NeighborResult(views_[(num + views_.size() - 1) % views_.size()], 0.0f);
-
-		case FOCUS_NEXT:
-			// If view not found, no neighbor to find.
-			if (num == -1)
-				return NeighborResult(0, 0.0f);
-			return NeighborResult(views_[(num + 1) % views_.size()], 0.0f);
-		default:
-			return NeighborResult(nullptr, 0.0f);
 		}
 	}
 
@@ -468,12 +453,22 @@ NeighborResult ViewGroup::FindNeighbor(View *view, FocusDirection direction, Nei
 			}
 			return result;
 		}
-
 	case FOCUS_PREV_PAGE:
 	case FOCUS_NEXT_PAGE:
 		return FindScrollNeighbor(view, Point(INFINITY, INFINITY), direction, result);
+	case FOCUS_PREV:
+		// If view not found, no neighbor to find.
+		if (num == -1)
+			return NeighborResult(nullptr, 0.0f);
+		return NeighborResult(views_[(num + views_.size() - 1) % views_.size()], 0.0f);
+	case FOCUS_NEXT:
+		// If view not found, no neighbor to find.
+		if (num == -1)
+			return NeighborResult(0, 0.0f);
+		return NeighborResult(views_[(num + 1) % views_.size()], 0.0f);
 
 	default:
+		ERROR_LOG(SYSTEM, "Bad focus direction %d", (int)direction);
 		return result;
 	}
 }
@@ -829,55 +824,57 @@ void AnchorLayout::MeasureViews(const UIContext &dc, MeasureSpec horiz, MeasureS
 	}
 }
 
+static void ApplyAnchorLayoutParams(float measuredWidth, float measuredHeight, const Bounds &container, const AnchorLayoutParams *params, Bounds *vBounds) {
+	vBounds->w = measuredWidth;
+	vBounds->h = measuredHeight;
+
+	// Clamp width/height to our own
+	if (vBounds->w > container.w) vBounds->w = container.w;
+	if (vBounds->h > container.h) vBounds->h = container.h;
+
+	float left = 0, top = 0, right = 0, bottom = 0;
+	bool center = false;
+	if (params) {
+		left = params->left;
+		top = params->top;
+		right = params->right;
+		bottom = params->bottom;
+		center = params->center;
+	}
+
+	if (left > NONE) {
+		vBounds->x = container.x + left;
+		if (center)
+			vBounds->x -= vBounds->w * 0.5f;
+	} else if (right > NONE) {
+		vBounds->x = container.x2() - right - vBounds->w;
+		if (center) {
+			vBounds->x += vBounds->w * 0.5f;
+		}
+	} else {
+		// Both left and right are NONE. Center.
+		vBounds->x = (container.w - vBounds->w) / 2.0f + container.x;
+	}
+
+	if (top > NONE) {
+		vBounds->y = container.y + top;
+		if (center)
+			vBounds->y -= vBounds->h * 0.5f;
+	} else if (bottom > NONE) {
+		vBounds->y = container.y2() - bottom - vBounds->h;
+		if (center)
+			vBounds->y += vBounds->h * 0.5f;
+	} else {
+		// Both top and bottom are NONE. Center.
+		vBounds->y = (container.h - vBounds->h) / 2.0f + container.y;
+	}
+}
+
 void AnchorLayout::Layout() {
 	for (size_t i = 0; i < views_.size(); i++) {
 		const AnchorLayoutParams *params = views_[i]->GetLayoutParams()->As<AnchorLayoutParams>();
-
 		Bounds vBounds;
-		vBounds.w = views_[i]->GetMeasuredWidth();
-		vBounds.h = views_[i]->GetMeasuredHeight();
-
-		// Clamp width/height to our own
-		if (vBounds.w > bounds_.w) vBounds.w = bounds_.w;
-		if (vBounds.h > bounds_.h) vBounds.h = bounds_.h;
-
-		float left = 0, top = 0, right = 0, bottom = 0;
-		bool center = false;
-		if (params) {
-			left = params->left;
-			top = params->top;
-			right = params->right;
-			bottom = params->bottom;
-			center = params->center;
-		}
-
-		if (left > NONE) {
-			vBounds.x = bounds_.x + left;
-			if (center)
-				vBounds.x -= vBounds.w * 0.5f;
-		} else if (right > NONE) {
-			vBounds.x = bounds_.x2() - right - vBounds.w;
-			if (center) {
-				vBounds.x += vBounds.w * 0.5f;
-			}
-		} else {
-			// Both left and right are NONE. Center.
-			vBounds.x = (bounds_.w - vBounds.w) / 2.0f + bounds_.x;
-		}
-
-		if (top > NONE) {
-			vBounds.y = bounds_.y + top;
-			if (center)
-				vBounds.y -= vBounds.h * 0.5f;
-		} else if (bottom > NONE) {
-			vBounds.y = bounds_.y2() - bottom - vBounds.h;
-			if (center)
-				vBounds.y += vBounds.h * 0.5f;
-		} else {
-			// Both top and bottom are NONE. Center.
-			vBounds.y = (bounds_.h - vBounds.h) / 2.0f + bounds_.y;
-		}
-
+		ApplyAnchorLayoutParams(views_[i]->GetMeasuredWidth(), views_[i]->GetMeasuredHeight(), bounds_, params, &vBounds);
 		views_[i]->SetBounds(vBounds);
 		views_[i]->Layout();
 	}
@@ -892,18 +889,22 @@ GridLayout::GridLayout(GridLayoutSettings settings, LayoutParams *layoutParams)
 void GridLayout::Measure(const UIContext &dc, MeasureSpec horiz, MeasureSpec vert) {
 	MeasureSpecType measureType = settings_.fillCells ? EXACTLY : AT_MOST;
 
+	int numItems = 0;
 	for (size_t i = 0; i < views_.size(); i++) {
-		views_[i]->Measure(dc, MeasureSpec(measureType, settings_.columnWidth), MeasureSpec(measureType, settings_.rowHeight));
+		if (views_[i]->GetVisibility() != V_GONE) {
+			views_[i]->Measure(dc, MeasureSpec(measureType, settings_.columnWidth), MeasureSpec(measureType, settings_.rowHeight));
+			numItems++;
+		}
 	}
 
 	// Use the max possible width so AT_MOST gives us the full size.
-	float maxWidth = (settings_.columnWidth + settings_.spacing) * views_.size() + settings_.spacing;
+	float maxWidth = (settings_.columnWidth + settings_.spacing) * numItems + settings_.spacing;
 	MeasureBySpec(layoutParams_->width, maxWidth, horiz, &measuredWidth_);
 
 	// Okay, got the width we are supposed to adjust to. Now we can calculate the number of columns.
 	numColumns_ = (measuredWidth_ - settings_.spacing) / (settings_.columnWidth + settings_.spacing);
 	if (!numColumns_) numColumns_ = 1;
-	int numRows = (int)(views_.size() + (numColumns_ - 1)) / numColumns_;
+	int numRows = (numItems + (numColumns_ - 1)) / numColumns_;
 
 	float estimatedHeight = (settings_.rowHeight + settings_.spacing) * numRows;
 
@@ -915,6 +916,9 @@ void GridLayout::Layout() {
 	int x = 0;
 	int count = 0;
 	for (size_t i = 0; i < views_.size(); i++) {
+		if (views_[i]->GetVisibility() == V_GONE)
+			continue;
+
 		const GridLayoutParams *lp = views_[i]->GetLayoutParams()->As<GridLayoutParams>();
 		Bounds itemBounds, innerBounds;
 		Gravity grav = lp ? lp->gravity : G_CENTER;
@@ -1176,6 +1180,26 @@ StickyChoice *ChoiceStrip::Choice(int index) {
 	if ((size_t)index < views_.size())
 		return static_cast<StickyChoice *>(views_[index]);
 	return nullptr;
+}
+
+CollapsibleSection::CollapsibleSection(const std::string &title, LayoutParams *layoutParams) : LinearLayout(ORIENT_VERTICAL, layoutParams) {
+	SetSpacing(0.0f);
+
+	heading_ = new CollapsibleHeader(&open_, title);
+	views_.push_back(heading_);
+	heading_->OnClick.Add([=](UI::EventParams &) {
+		// Change the visibility of all children except the first one.
+		// Later maybe try something more ambitious.
+		for (size_t i = 1; i < views_.size(); i++) {
+			views_[i]->SetVisibility(open_ ? V_VISIBLE : V_GONE);
+		}
+		return UI::EVENT_DONE;
+	});
+}
+
+void CollapsibleSection::Update() {
+	ViewGroup::Update();
+	heading_->SetHasSubitems(views_.size() > 1);
 }
 
 }  // namespace UI

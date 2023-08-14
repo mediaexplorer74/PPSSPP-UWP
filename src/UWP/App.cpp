@@ -201,9 +201,8 @@ void App::Run() {
 	while (!m_windowClosed) {
 		if (m_windowVisible) {
 			CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
-			if (m_main->Render()) {
-				m_deviceResources->Present();
-			}
+			m_main->Render();
+			// TODO: Adopt some practices from m_deviceResources->Present();
 		} else {
 			CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessOneAndAllPending);
 		}
@@ -217,7 +216,6 @@ void App::Uninitialize() {
 }
 
 // Application lifecycle event handlers.
-extern LaunchItem launchItem;
 void App::OnActivated(CoreApplicationView^ applicationView, IActivatedEventArgs^ args) {
 	// Run() won't start until the CoreWindow is activated.
 	CoreWindow::GetForCurrentThread()->Activate();
@@ -228,15 +226,8 @@ void App::OnActivated(CoreApplicationView^ applicationView, IActivatedEventArgs^
 	if (g_Config.UseFullScreen())
 		Windows::UI::ViewManagement::ApplicationView::GetForCurrentView()->TryEnterFullScreenMode();
 
-	if (args->Kind == ActivationKind::File) {
-		FileActivatedEventArgs^ protocolArgs = dynamic_cast<Windows::ApplicationModel::Activation::FileActivatedEventArgs^>(args);
-		launchItem = LaunchItem((StorageFile^)protocolArgs->Files->GetAt(0));
-	}
-	if (args->Kind == ActivationKind::Protocol)
-	{
-		ProtocolActivatedEventArgs^ protocolArgs = dynamic_cast<Windows::ApplicationModel::Activation::ProtocolActivatedEventArgs^>(args);
-		launchItem = LaunchItem(protocolArgs);
-	}
+	//Detect if app started or activated by launch item (file, uri)
+	DetectLaunchItem(args);
 }
 
 void App::OnSuspending(Platform::Object^ sender, SuspendingEventArgs^ args) {
@@ -281,7 +272,7 @@ void App::OnWindowSizeChanged(CoreWindow^ sender, WindowSizeChangedEventArgs^ ar
 	PSP_CoreParameter().pixelWidth = (int)(width * scale);
 	PSP_CoreParameter().pixelHeight = (int)(height * scale);
 	if (UpdateScreenScale((int)width, (int)height)) {
-		NativeMessageReceived("gpu_displayResized", "");
+		System_PostUIMessage("gpu_displayResized", "");
 	}
 }
 

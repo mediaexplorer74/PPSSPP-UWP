@@ -113,7 +113,7 @@ static void LoadThemeInfo(const std::vector<Path> &directories) {
 
 			// Alright, let's loop through the sections and see if any is a theme.
 			for (size_t i = 0; i < ini.Sections().size(); i++) {
-				Section &section = ini.Sections()[i];
+				Section &section = *(ini.Sections()[i].get());
 				ThemeInfo info;
 				section.Get("Name", &info.name, section.name().c_str());
 
@@ -191,12 +191,12 @@ void UpdateTheme(UIContext *ctx) {
 
 #if defined(USING_WIN_UI) || PPSSPP_PLATFORM(UWP) || defined(USING_QT_UI)
 	ui_theme.uiFont = UI::FontStyle(FontID("UBUNTU24"), g_Config.sFont.c_str(), 22);
-	ui_theme.uiFontSmall = UI::FontStyle(FontID("UBUNTU24"), g_Config.sFont.c_str(), 15);
-	ui_theme.uiFontSmaller = UI::FontStyle(FontID("UBUNTU24"), g_Config.sFont.c_str(), 12);
+	ui_theme.uiFontSmall = UI::FontStyle(FontID("UBUNTU24"), g_Config.sFont.c_str(), 17);
+	ui_theme.uiFontSmaller = UI::FontStyle(FontID("UBUNTU24"), g_Config.sFont.c_str(), 13);
 #else
 	ui_theme.uiFont = UI::FontStyle(FontID("UBUNTU24"), "", 20);
-	ui_theme.uiFontSmall = UI::FontStyle(FontID("UBUNTU24"), "", 14);
-	ui_theme.uiFontSmaller = UI::FontStyle(FontID("UBUNTU24"), "", 11);
+	ui_theme.uiFontSmall = UI::FontStyle(FontID("UBUNTU24"), "", 15);
+	ui_theme.uiFontSmaller = UI::FontStyle(FontID("UBUNTU24"), "", 12);
 #endif
 
 	ui_theme.checkOn = ImageID("I_CHECKEDBOX");

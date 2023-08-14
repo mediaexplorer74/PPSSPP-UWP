@@ -1,5 +1,5 @@
 # ################################################################
-# Copyright (c) Yann Collet, Facebook, Inc.
+# Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 #
 # This source code is licensed under both the BSD-style license (found in the
@@ -225,24 +225,31 @@ zstd-noxz : zstd
 .PHONY: zstd-dll
 zstd-dll : LDFLAGS+= -L$(LIBZSTD)
 zstd-dll : LDLIBS += -lzstd
-zstd-dll : ZSTDLIB_LOCAL_SRC = xxhash.c
+zstd-dll : ZSTDLIB_LOCAL_SRC = xxhash.c pool.c threading.c
 zstd-dll : zstd
 
 
 ## zstd-pgo: zstd executable optimized with PGO.
 .PHONY: zstd-pgo
+zstd-pgo : LLVM_PROFDATA?=llvm-profdata
+zstd-pgo : PROF_GENERATE_FLAGS=-fprofile-generate $(if $(findstring gcc,$(CC)),-fprofile-dir=.)
+zstd-pgo : PROF_USE_FLAGS=-fprofile-use $(if $(findstring gcc,$(CC)),-fprofile-dir=. -Werror=missing-profile -Wno-error=coverage-mismatch)
 zstd-pgo :
-	$(MAKE) clean
-	$(MAKE) zstd MOREFLAGS=-fprofile-generate
+	$(MAKE) clean HASH_DIR=$(HASH_DIR)
+	$(MAKE) zstd HASH_DIR=$(HASH_DIR) MOREFLAGS="$(PROF_GENERATE_FLAGS)"
 	./zstd -b19i1 $(PROFILE_WITH)
 	./zstd -b16i1 $(PROFILE_WITH)
 	./zstd -b9i2 $(PROFILE_WITH)
 	./zstd -b $(PROFILE_WITH)
 	./zstd -b7i2 $(PROFILE_WITH)
 	./zstd -b5 $(PROFILE_WITH)
-	$(RM) zstd *.o
-	case $(CC) in *clang*) if ! [ -e default.profdata ]; then llvm-profdata merge -output=default.profdata default*.profraw; fi ;; esac
-	$(MAKE) zstd MOREFLAGS=-fprofile-use
+ifndef BUILD_DIR
+	$(RM) zstd obj/$(HASH_DIR)/zstd obj/$(HASH_DIR)/*.o
+else
+	$(RM) zstd $(BUILD_DIR)/zstd $(BUILD_DIR)/*.o
+endif
+	case $(CC) in *clang*) if ! [ -e default.profdata ]; then $(LLVM_PROFDATA) merge -output=default.profdata default*.profraw; fi ;; esac
+	$(MAKE) zstd HASH_DIR=$(HASH_DIR) MOREFLAGS="$(PROF_USE_FLAGS)"
 
 ## zstd-small: minimal target, supporting only zstd compression and decompression. no bench. no legacy. no other format.
 CLEAN += zstd-small zstd-frugal
@@ -272,7 +279,7 @@ generate_res: $(RES64_FILE) $(RES32_FILE)
 
 ifneq (,$(filter Windows%,$(OS)))
 RC ?= windres
-# http://stackoverflow.com/questions/708238/how-do-i-add-an-icon-to-a-mingw-gcc-compiled-executable
+# https://stackoverflow.com/questions/708238/how-do-i-add-an-icon-to-a-mingw-gcc-compiled-executable
 $(RES64_FILE): windres/zstd.rc
 	$(RC) -o $@ -I ../lib -I windres -i $< -O coff -F pe-x86-64
 $(RES32_FILE): windres/zstd.rc

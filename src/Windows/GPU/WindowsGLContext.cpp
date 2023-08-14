@@ -22,7 +22,7 @@
 #include "Common/GPU/OpenGL/GLFeatures.h"
 #include "Common/GPU/thin3d_create.h"
 #include "Common/GPU/OpenGL/GLRenderManager.h"
-#include "Common/System/System.h"
+#include "Common/System/OSD.h"
 #include "GL/gl.h"
 #include "GL/wglew.h"
 #include "Core/Config.h"
@@ -39,7 +39,7 @@
 // Currently, just compile time for debugging.  May be NVIDIA only.
 static const int simulateGLES = false;
 
-void WindowsGLContext::SwapBuffers() {
+void WindowsGLContext::Poll() {
 	// We no longer call RenderManager::Swap here, it's handled by the render thread, which
 	// we're not on here.
 
@@ -422,7 +422,7 @@ bool WindowsGLContext::InitFromRenderThread(std::string *error_message) {
 	}
 
 	draw_->SetErrorCallback([](const char *shortDesc, const char *details, void *userdata) {
-		System_NotifyUserMessage(details, 5.0, 0xFFFFFFFF, "error_callback");
+		g_OSD.Show(OSDType::MESSAGE_ERROR, details, 0.0f, "error_callback");
 	}, nullptr);
 
 	// These are auto-reset events.
@@ -432,7 +432,7 @@ bool WindowsGLContext::InitFromRenderThread(std::string *error_message) {
 	renderManager_ = (GLRenderManager *)draw_->GetNativeObject(Draw::NativeObject::RENDER_MANAGER);
 	renderManager_->SetInflightFrames(g_Config.iInflightFrames);
 	SetGPUBackend(GPUBackend::OPENGL);
-	renderManager_->SetSwapFunction([&]() {::SwapBuffers(hDC); }, true);
+	renderManager_->SetSwapFunction([&]() {::SwapBuffers(hDC); });
 	if (wglSwapIntervalEXT) {
 		// glew loads wglSwapIntervalEXT if available
 		renderManager_->SetSwapIntervalFunction([&](int interval) {

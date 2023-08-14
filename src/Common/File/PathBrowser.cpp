@@ -17,7 +17,6 @@
 
 #if PPSSPP_PLATFORM(ANDROID)
 #include "android/jni/app-android.h"
-#include "android/jni/AndroidContentURI.h"
 #endif
 
 bool LoadRemoteFileList(const Path &url, const std::string &userAgent, bool *cancel, std::vector<File::FileInfo> &files) {
@@ -39,7 +38,7 @@ bool LoadRemoteFileList(const Path &url, const std::string &userAgent, bool *can
 	http::RequestParams req(baseURL.Resource(), "text/plain, text/html; q=0.9, */*; q=0.8");
 	if (http.Resolve(baseURL.Host().c_str(), baseURL.Port())) {
 		if (http.Connect(2, 20.0, cancel)) {
-			http::RequestProgress progress(cancel);
+			net::RequestProgress progress(cancel);
 			code = http.GET(req, &result, responseHeaders, &progress);
 			http.Disconnect();
 		}
@@ -211,7 +210,7 @@ std::string PathBrowser::GetFriendlyPath() const {
 bool PathBrowser::GetListing(std::vector<File::FileInfo> &fileInfo, const char *filter, bool *cancel) {
 	std::unique_lock<std::mutex> guard(pendingLock_);
 	while (!IsListingReady() && (!cancel || !*cancel)) {
-		// In case cancel changes, just sleep.
+		// In case cancel changes, just sleep. TODO: Replace with condition variable.
 		guard.unlock();
 		sleep_ms(50);
 		guard.lock();
@@ -222,14 +221,6 @@ bool PathBrowser::GetListing(std::vector<File::FileInfo> &fileInfo, const char *
 }
 
 bool PathBrowser::CanNavigateUp() {
-/* Leaving this commented out, not sure if there's a use in UWP for navigating up from the user data folder.
-#if PPSSPP_PLATFORM(UWP)
-	// Can't navigate up from memstick folder :(
-	if (path_ == GetSysDirectory(DIRECTORY_MEMSTICK_ROOT)) {
-		return false;
-	}
-#endif
-*/
 	return path_.CanNavigateUp();
 }
 
